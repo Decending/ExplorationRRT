@@ -12,6 +12,7 @@
 #include <chrono>
 #include <visualization_msgs/Marker.h>
 #include "nav_msgs/Odometry.h"
+#include <math.h>
 
 using namespace std::chrono;
 using namespace std;
@@ -39,31 +40,35 @@ struct node{
       void changeDistanceToGoal(double newDistance){
         distanceToGoal = newDistance;
       }
-      void changeDistanceToParent(double newDistance){
-        distanceToParent = newDistance;
+      void changeDistanceToParent(){
+        if(myParent != nullptr){
+          distanceToParent = sqrt(pow(point->x() - myParent->point->x(), 2) + pow(point->y() - myParent->point->y(), 2) + pow(point->z() - myParent->point->z(), 2));
+        }
+        else{
+          distanceToParent = 0;
+        }
       }
       double sumDistance(){
-        double myDistance;
-        if(&myParent != nullptr){
-          myDistance = myParent->sumDistance();
-        }
-        if(&myParent == nullptr){
-          return 0;
-        }
-        return myDistance + distanceToParent;
-      }
-      void getPath(std::list<struct node*>* givenPath){
-        std::cout << "Varför" << std::endl;
+        changeDistanceToParent();
+        double myDistance = 0;
         if(myParent != nullptr){
-          std::cout << "du" << std::endl;
-          myParent->getPath(givenPath);
-          std::cout << "trash" << std::endl;
-          givenPath->push_back(myParent);
-          std::cout << ", boi" << std::endl;
+          myDistance = myParent->sumDistance();
+          changeDistanceToParent();
         }
         if(myParent == nullptr){
-          std::cout << "bottom reached" << std::endl;
+          return 0;
         }
+        return (myDistance + distanceToParent);
+      }
+      void getPath(std::list<struct node*>* givenPath){
+        if(myParent != nullptr){
+          myParent->getPath(givenPath);
+          givenPath->push_back(myParent);
+        }
+        if(myParent == nullptr){
+          return;
+        }
+        return;
       }
 };
 
@@ -75,7 +80,10 @@ bool RUN_BY_NODES = true;
 double SENSOR_RANGE = 2;
 int itterations;
 int STEP_LENGTH = 1;
-float SCALER = 10;
+float SCALER_AABB = 10;
+float SCALER_X;
+float SCALER_Y;
+float SCALER_Z;
 double radius = 0.5;
 bool map_received = false;
 bool RRT_created = false;
@@ -84,8 +92,14 @@ bool fetched_path = false;
 float position_x = 0;
 float position_y = 0;
 float position_z = 0;
-double arbitraryDistance = 2;
+double arbitraryDistance = 0.5;
 struct node* goalNode;
+float lowest_x;
+float lowest_y;
+float lowest_z;
+float highest_x;
+float highest_y;
+float highest_z;
 
 
 // Create a colored UFOMap
@@ -94,6 +108,38 @@ std::list<struct node> RRT_TREE{};
 std::list<struct node*> PATH{};
 std::list<ufo::math::Vector3> myGoals{};
 std::list<struct node> goalNodes{};
+
+void tuneGeneration(ufo::map::OccupancyMapColor const& map, bool occupied_space, bool free_space, bool unknown_space, ufo::map::DepthType min_depth = 0){
+  highest_x = std::numeric_limits<float>::min();
+  highest_y = std::numeric_limits<float>::min();
+  highest_z = std::numeric_limits<float>::min();
+  lowest_x = std::numeric_limits<float>::max();
+  lowest_y = std::numeric_limits<float>::max();
+  lowest_z = std::numeric_limits<float>::max();
+  ufo::math::Vector3 minPoint(position_x - 1 * SCALER_AABB, position_y - 1 * SCALER_AABB, position_z - 1 * SCALER_AABB);
+  ufo::math::Vector3 maxPoint(position_x - 1 + SCALER_AABB, position_y + 1 * SCALER_AABB, position_z + 1 * SCALER_AABB);
+  ufo::geometry::AABB aabb(minPoint, maxPoint);
+  for (auto it = map.beginLeaves(aabb, occupied_space, free_space, unknown_space, false, min_depth), it_end = map.endLeaves(); it != it_end; ++it) {
+    if(it.getX() > highest_x){
+      highest_x = it.getX();
+    }if(it.getX() < lowest_x){
+      lowest_x = it.getX();
+    }
+    if(it.getY() > highest_y){
+      highest_y = it.getX();
+    }if(it.getY() < lowest_y){
+      lowest_y = it.getY();
+    }
+    if(it.getZ() > highest_z){
+      highest_z = it.getX();
+    }if(it.getZ() < lowest_z){
+      lowest_z = it.getZ();
+    }
+  }
+  SCALER_X = highest_x - lowest_x;
+  SCALER_Y = highest_y - lowest_y;
+  SCALER_Z = highest_z - lowest_z;
+}
 
 bool isInCollision(ufo::map::OccupancyMapColor const& map, 
                    ufo::geometry::BoundingVar const& bounding_volume, 
@@ -116,9 +162,9 @@ void generateGoals(){
   ufo::math::Vector3 goal;
   srand(time(0));
   while((myGoals.size() < NUMBER_OF_GOALS) and (itterations < 10000)){
-    float x = 1024 * rand () / (RAND_MAX + 1.0) * SCALER;
-    float y = 1024 * rand () / (RAND_MAX + 1.0) * SCALER;
-    float z = 1024 * rand () / (RAND_MAX + 1.0) * SCALER;
+    float x = lowest_x + 1024 * rand () / (RAND_MAX + 1.0) * SCALER_X;
+    float y = lowest_y + 1024 * rand () / (RAND_MAX + 1.0) * SCALER_Y;
+    float z = lowest_z + 1024 * rand () / (RAND_MAX + 1.0) * SCALER_Z;
     ufo::math::Vector3 goal(position_x + x, position_y + y, position_z + z);
     ufo::geometry::Sphere goal_sphere(goal, radius);
     if(!isInCollision(myMap, goal_sphere, true, false, true, 0) and isInCollision(myMap, goal_sphere, false, true, false, 0)){
@@ -126,14 +172,17 @@ void generateGoals(){
     };
       itterations++;
   };
-  
   std::cout << "Goals generated successfully\n" << std::endl;
 };
 
 void setPath(){
+  float distanceToTravel = std::numeric_limits<float>::max();
   for(std::list<node>::iterator it_goal = goalNodes.begin(); it_goal != goalNodes.end(); it_goal++){
-    if(it_goal->distanceToGoal < goalNode->distanceToGoal){
+    if((it_goal->sumDistance() < distanceToTravel)){
+      distanceToTravel = it_goal->sumDistance();
+      //std::cout << "distance to travel: " << distanceToTravel << std::endl;
       goalNode = &*it_goal;
+      //std::cout << "complete answer: " << sqrt(pow(goalNode->point->x() - goalNode->myParent->point->x(), 2) + pow(goalNode->point->y() - goalNode->myParent->point->y(), 2) + pow(goalNode->point->z() - goalNode->myParent->point->z(), 2)) << std::endl;
     }
   }
 }
@@ -146,15 +195,13 @@ void generateRRT(){
   node origin(position_x, position_y, position_z);
   origin.addParent(nullptr);
   origin.changeDistanceToGoal(std::numeric_limits<double>::max());
-  goalNode = &origin;
-  std::cout << goalNode->distanceToGoal << std::endl;
   RRT_TREE.push_back(origin);
   srand(time(0));
   while(((RRT_TREE.size() <= NUMBER_OF_NODES and RUN_BY_NODES) or (itterations <= NUMBER_OF_ITTERATIONS and !RUN_BY_NODES)) and itterations < 100000){
     // Generate a random point
-    float x = 1024 * rand () / (RAND_MAX + 1.0) * SCALER;
-    float y = 1024 * rand () / (RAND_MAX + 1.0) * SCALER;
-    float z = 1024 * rand () / (RAND_MAX + 1.0) * SCALER;
+    float x = lowest_x + 1024 * rand () / (RAND_MAX + 1.0) * SCALER_X;
+    float y = lowest_y + 1024 * rand () / (RAND_MAX + 1.0) * SCALER_Y;
+    float z = lowest_z + 1024 * rand () / (RAND_MAX + 1.0) * SCALER_Z;
     ufo::math::Vector3 random_point(position_x + x, position_y + y, position_z + z);
     // If the point is not occupied, continue
     if(!isInCollision(myMap, random_point, true, false, true, 0) and isInCollision(myMap, random_point, false, true, false, 0)){
@@ -184,8 +231,7 @@ void generateRRT(){
         RRT_TREE.push_back(new_node);
         for(std::list<ufo::math::Vector3>::iterator it_goals = myGoals.begin(); it_goals != myGoals.end(); it_goals++){
         
-          ufo::math::Vector3 direction = *(new_node.point) - *(it_goals);
-          double new_distance = direction.norm();
+          float new_distance = sqrt(pow(new_node.point->x() - it_goals->x(), 2) + pow(new_node.point->y() - it_goals->y(), 2) + pow(new_node.point->z() - it_goals->z(), 2));
           if(new_distance < new_node.distanceToGoal){
             new_node.changeDistanceToGoal(new_distance);
           }
@@ -231,7 +277,7 @@ void mapCallback(ufomap_msgs::UFOMapStamped::ConstPtr const& msg)
   // Convert ROS message to UFOMap
   if (ufomap_msgs::msgToUfo(msg->map, myMap)) {
     // Conversion was successful
-    std::cout << "Conversion sucessful" << std::endl;
+    //std::cout << "Conversion sucessful" << std::endl;
     map_received = true;
   } else {
     std::cout << "Conversion failed" << std::endl;
@@ -267,7 +313,10 @@ int main(int argc, char *argv[])
   while(ros::ok()){
     if(map_received and not RRT_created){
       itterations = 0;
+      tuneGeneration(myMap, false, true, false, 0);
+      myGoals.clear();
       generateGoals();
+      goalNodes.clear();
       itterations = 0;
       auto start = high_resolution_clock::now();
       generateRRT();
@@ -336,13 +385,9 @@ int main(int argc, char *argv[])
       PATH_line_list.color.b = 1.0;
       PATH_line_list.color.a = 1.0;
       setPath();
-      std::cout << "Kalle" << std::endl;
-      std::cout << PATH.size() << std::endl;
-      std::cout << "Löfgren" << std::endl;
+      PATH.clear();
       goalNode->getPath(&PATH);
       PATH.push_back(goalNode);
-      std::cout << "Kalle" << std::endl;
-      cout << PATH.size() << endl;
       std::list<node*>::iterator it_comeon_visualizer2;	
       for(it_comeon_visualizer2 = PATH.begin(); it_comeon_visualizer2 != PATH.end(); it_comeon_visualizer2++){
         geometry_msgs::Point p;
@@ -370,7 +415,7 @@ int main(int argc, char *argv[])
       GOAL_points.type = visualization_msgs::Marker::POINTS;
       GOAL_points.scale.x = 0.2;
       GOAL_points.scale.y = 0.2;
-      GOAL_points.color.g = 1.0f;
+      GOAL_points.color.r = 1.0f;
       GOAL_points.color.a = 1.0;
       std::list<ufo::math::Vector3>::iterator it_comeon_visualizer3;	
       for(it_comeon_visualizer3 = myGoals.begin(); it_comeon_visualizer3 != myGoals.end(); it_comeon_visualizer3++){
@@ -392,9 +437,10 @@ int main(int argc, char *argv[])
       msg->header.frame_id = "map";
       map_pub.publish(msg);					        
     }
-    //itterations++;
+    itterations++;
     if(itterations > 100){
       itterations = 0;
+      fetched_path = false;
       RRT_created = false;
     }
     }
