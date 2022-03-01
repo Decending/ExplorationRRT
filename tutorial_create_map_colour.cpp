@@ -103,7 +103,7 @@ float highest_z;
 
 
 // Create a colored UFOMap
-ufo::map::OccupancyMapColor myMap(0.1);
+ufo::map::OccupancyMapColor myMap(0.7);
 std::list<struct node> RRT_TREE{};
 std::list<struct node*> PATH{};
 std::list<ufo::math::Vector3> myGoals{};
@@ -157,7 +157,7 @@ bool isInCollision(ufo::map::OccupancyMapColor const& map,
   return false;
 }
 
-void generateGoals(){
+void generateGoals(ufo::map::OccupancyMapColor const& map){
   // Generate goals, check for occupancy status
   ufo::math::Vector3 goal;
   srand(time(0));
@@ -168,11 +168,30 @@ void generateGoals(){
     ufo::math::Vector3 goal(position_x + x, position_y + y, position_z + z);
     ufo::geometry::Sphere goal_sphere(goal, radius);
     if(!isInCollision(myMap, goal_sphere, true, false, true, 0) and isInCollision(myMap, goal_sphere, false, true, false, 0)){
-      myGoals.push_back(goal);
+      ufo::math::Vector3 min_point(position_x + x - SENSOR_RANGE, position_y + y - SENSOR_RANGE, position_z + z - SENSOR_RANGE);
+      ufo::math::Vector3 max_point(position_x + x + SENSOR_RANGE, position_y + y + SENSOR_RANGE, position_z + z + SENSOR_RANGE);
+      ufo::math::Vector3 position(position_x, position_y, position_z);
+      ufo::geometry::AABB aabb(min_point, max_point);
+      for (auto it = map.beginLeaves(aabb, false, false, true, false, 0), it_end = map.endLeaves(); it != it_end; ++it) {
+        if (it.isUnknown()) {
+          ufo::math::Vector3 unknownNode(it.getX(), it.getY(), it.getZ());
+          ufo::geometry::LineSegment myLine(goal, unknownNode);
+          if(!isInCollision(map, myLine, true, false, false, 0)){
+            myGoals.push_back(goal);
+            std::cout << "Jojo, vi hittade en" << std::endl;
+            break;
+          }
+        }
+      break;
+      }
     };
       itterations++;
   };
-  std::cout << "Goals generated successfully\n" << std::endl;
+  if(myGoals.size() == 3){
+    std::cout << "Goals generated successfully\n" << std::endl;
+  } else{
+    std::cout << "Only " << myGoals.size() << " goals found" << std::endl;
+  }
 };
 
 void setPath(){
@@ -315,7 +334,7 @@ int main(int argc, char *argv[])
       itterations = 0;
       tuneGeneration(myMap, false, true, false, 0);
       myGoals.clear();
-      generateGoals();
+      generateGoals(myMap);
       goalNodes.clear();
       itterations = 0;
       auto start = high_resolution_clock::now();
@@ -334,7 +353,7 @@ int main(int argc, char *argv[])
     if(map_received and RRT_created){
       visualization_msgs::Marker RRT_points, RRT_line_list, PATH_points, PATH_line_list, GOAL_points;
     
-      RRT_points.header.frame_id = RRT_line_list.header.frame_id = "map";
+      RRT_points.header.frame_id = RRT_line_list.header.frame_id = "odom_shafter";
       RRT_points.ns = "points";
       RRT_points.action = visualization_msgs::Marker::ADD;
       RRT_points.pose.orientation.w = 1.0;
@@ -369,7 +388,7 @@ int main(int argc, char *argv[])
       
       if(!fetched_path and RRT_created){
       fetched_path = true;
-      PATH_points.header.frame_id = PATH_line_list.header.frame_id = "map";
+      PATH_points.header.frame_id = PATH_line_list.header.frame_id = "odom_shafter";
       PATH_points.ns = "points";
       PATH_points.action = visualization_msgs::Marker::ADD;
       PATH_points.pose.orientation.w = 1.0;
@@ -407,7 +426,7 @@ int main(int argc, char *argv[])
       path_pub.publish(PATH_line_list);
       }
       
-      GOAL_points.header.frame_id = "map";
+      GOAL_points.header.frame_id = "odom_shafter";
       GOAL_points.ns = "points";
       GOAL_points.action = visualization_msgs::Marker::ADD;
       GOAL_points.pose.orientation.w = 1.0;
@@ -432,10 +451,13 @@ int main(int argc, char *argv[])
       ufo::map::DepthType pub_depth = 0;
       // Convert UFOMap to ROS message
     if (ufomap_msgs::ufoToMsg(myMap, msg->map, compress, pub_depth)) {
+      //std::cout << "Map conversion success!" << std::endl;
       // Conversion was successful
       msg->header.stamp = ros::Time::now();
-      msg->header.frame_id = "map";
+      msg->header.frame_id = "odom_shafter";
       map_pub.publish(msg);					        
+    }else{
+      std::cout << "Map conversion failed!" << std::endl;
     }
     itterations++;
     if(itterations > 100){
