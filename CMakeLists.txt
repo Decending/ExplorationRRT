@@ -9,11 +9,11 @@ project(tutorials)
 ## is used, also find other catkin packages	
 find_package(catkin REQUIRED COMPONENTS
   roscpp
-  ufomap
   ufomap_msgs
   ufomap_ros
   tf2_ros
 )
+find_package(ufomap REQUIRED)
 
 include_directories(${catkin_INCLUDE_DIRS})
 
@@ -154,7 +154,10 @@ add_executable(Tutorial_create_map_colour_node tutorial_create_map_colour.cpp)
 # target_link_libraries(${PROJECT_NAME}_node
 #   ${catkin_LIBRARIES}
 # )
-target_link_libraries(Tutorial_create_map_colour_node ${catkin_LIBRARIES} UFO::Map)
+target_link_libraries(Tutorial_create_map_colour_node
+  ${catkin_LIBRARIES}
+)
+target_link_libraries(Tutorial_create_map_colour_node UFO::Map)
 
 #############
 ## Install ##
