@@ -63,18 +63,13 @@ struct node{
       }
       
       void getPath(std::list<struct node*>* givenPath){
-        std::cout << "kommer man in?" << std::endl;
         if(myParent != nullptr){
-          std::cout << "Going down" << std::endl;
           myParent->getPath(givenPath);
-          std::cout << "Going up" << std::endl;
           givenPath->push_back(myParent);
         }
         if(myParent == nullptr){
-          std::cout << "Bottom" << std::endl;
           return;
         }
-        std::cout << "Smäller det?" << std::endl;
         return;
       }
       
@@ -104,28 +99,28 @@ struct node{
           for (auto it = map.beginLeaves(frustXP, false, false, true, false, 0), it_end = map.endLeaves(); it != it_end; ++it){
             ufo::math::Vector3 end_point(it.getX(), it.getY(), it.getZ());
             ufo::geometry::LineSegment myLine(*point, end_point);
-            if(!isInCollision(map, myLine, true, false, false, 0)){
+            if(!isInCollision(map, myLine, true, false, false, 4)){
               myHits.push_back(&end_point);
             }
           }
           for (auto it = map.beginLeaves(frustXN, false, false, true, false, 0), it_end = map.endLeaves(); it != it_end; ++it){
             ufo::math::Vector3 end_point(it.getX(), it.getY(), it.getZ());
             ufo::geometry::LineSegment myLine(*point, end_point);
-            if(!isInCollision(map, myLine, true, false, false, 0)){
+            if(!isInCollision(map, myLine, true, false, false, 4)){
               myHits.push_back(&end_point);
             }
           }
           for (auto it = map.beginLeaves(frustYP, false, false, true, false, 0), it_end = map.endLeaves(); it != it_end; ++it){
             ufo::math::Vector3 end_point(it.getX(), it.getY(), it.getZ());
             ufo::geometry::LineSegment myLine(*point, end_point);
-            if(!isInCollision(map, myLine, true, false, false, 0)){
+            if(!isInCollision(map, myLine, true, false, false, 4)){
               myHits.push_back(&end_point);
             }
           }
           for (auto it = map.beginLeaves(frustYN, false, false, true, false, 0), it_end = map.endLeaves(); it != it_end; ++it){
             ufo::math::Vector3 end_point(it.getX(), it.getY(), it.getZ());
             ufo::geometry::LineSegment myLine(*point, end_point);
-            if(!isInCollision(map, myLine, true, false, false, 0)){
+            if(!isInCollision(map, myLine, true, false, false, 4)){
               myHits.push_back(&end_point);
             }
           }
@@ -198,9 +193,8 @@ float highest_z;
 ufo::map::OccupancyMapColor myMap(0.7);
 std::list<struct node> RRT_TREE{};
 std::list<struct node*> PATH{};
-std::list<ufo::math::Vector3> myGoals{};
+std::list<struct node> myGoals{};
 std::list<ufo::math::Vector3> hits{};
-std::list<struct node> goalNodes{};
 
 void tuneGeneration(ufo::map::OccupancyMapColor const& map, bool occupied_space, bool free_space, bool unknown_space, ufo::map::DepthType min_depth = 0){
   highest_x = std::numeric_limits<float>::min();
@@ -232,6 +226,24 @@ void tuneGeneration(ufo::map::OccupancyMapColor const& map, bool occupied_space,
   SCALER_X = highest_x - lowest_x;
   SCALER_Y = highest_y - lowest_y;
   SCALER_Z = highest_z - lowest_z;
+}
+
+void findShortestPath(){
+  for(std::list<node>::iterator it_goals = myGoals.begin(); it_goals != myGoals.end(); it_goals++){
+    struct node* chosenNode;
+    double distance = std::numeric_limits<double>::max();
+    for(std::list<node>::iterator it_RRT = RRT_TREE.begin(); it_RRT != RRT_TREE.end(); it_RRT++){
+      double distanceNodeToGoal = sqrt(pow(it_RRT->point->x() - it_goals->point->x(), 2) + pow(it_RRT->point->y() - it_goals->point->y(), 2) + pow(it_RRT->point->z() - it_goals->point->z(), 2));
+      double distanceToNode = it_RRT->sumDistance();
+      double totalDistance = distanceNodeToGoal + distanceToNode;
+      if(totalDistance < distance){
+        distance = totalDistance;
+        chosenNode = &*it_RRT;
+      }
+    }
+    it_goals->addParent(chosenNode);
+    chosenNode->addChild(&*it_goals);
+  }
 }
 
 bool isInCollision(ufo::map::OccupancyMapColor const& map, 
@@ -270,7 +282,8 @@ void generateGoals(ufo::map::OccupancyMapColor const& map){
           ufo::math::Vector3 unknownNode(it.getX(), it.getY(), it.getZ());
           ufo::geometry::LineSegment myLine(goal, unknownNode);
           if(!isInCollision(map, myLine, true, false, false, 0)){
-            myGoals.push_back(goal);
+            node newGoal(x, y, z);
+            myGoals.push_back(newGoal);
             break;
           }
         }
@@ -292,7 +305,7 @@ void generateGoals(ufo::map::OccupancyMapColor const& map){
 void setPath(){
   int totalHits = 0;
   int newHits = 0;
-  for(std::list<node>::iterator it_goal = goalNodes.begin(); it_goal != goalNodes.end(); it_goal++){
+  for(std::list<node>::iterator it_goal = myGoals.begin(); it_goal != myGoals.end(); it_goal++){
     newHits = it_goal->findInformationGain(SCALER_AABB, myMap);
     if(newHits > totalHits){
       totalHits = newHits;
@@ -308,7 +321,6 @@ void generateRRT(){
   float sensor_range = 2;
   node origin(position_x, position_y, position_z);
   origin.addParent(nullptr);
-  origin.changeDistanceToGoal(std::numeric_limits<double>::max());
   RRT_TREE.push_back(origin);
   srand(time(0));
   while(((RRT_TREE.size() <= NUMBER_OF_NODES and RUN_BY_NODES) or (itterations <= NUMBER_OF_ITTERATIONS and !RUN_BY_NODES)) and itterations < 100000){
@@ -337,19 +349,8 @@ void generateRRT(){
       if(!isInCollision(myMap, myLine, true, false, true, 0)) {
         node new_node(x, y, z);
         new_node.addParent(parent);
-        new_node.changeDistanceToGoal(std::numeric_limits<double>::max());
         parent->addChild(&new_node);
         RRT_TREE.push_back(new_node);
-        for(std::list<ufo::math::Vector3>::iterator it_goals = myGoals.begin(); it_goals != myGoals.end(); it_goals++){
-        
-          float new_distance = sqrt(pow(new_node.point->x() - it_goals->x(), 2) + pow(new_node.point->y() - it_goals->y(), 2) + pow(new_node.point->z() - it_goals->z(), 2));
-          if(new_distance < new_node.distanceToGoal){
-            new_node.changeDistanceToGoal(new_distance);
-          }
-        }
-        if(new_node.distanceToGoal < arbitraryDistance){
-          goalNodes.push_back(new_node);
-        }
       }
     };
     // find closest node in the RRT-TREE
@@ -427,7 +428,6 @@ int main(int argc, char *argv[])
       tuneGeneration(myMap, false, true, false, 0);
       myGoals.clear();
       generateGoals(myMap);
-      goalNodes.clear();
       itterations = 0;
       auto start = high_resolution_clock::now();
       std::cout << "glider in 0" << std::endl;
@@ -440,6 +440,7 @@ int main(int argc, char *argv[])
       }else{
         cout << "\nTimeout after " << duration.count() << " micro seconds for " << itterations << " itterations." << endl;
       }
+      findShortestPath();
       RRT_created = true;
       itterations = 0;
     }
@@ -535,12 +536,12 @@ int main(int argc, char *argv[])
       GOAL_points.scale.y = 0.2;
       GOAL_points.color.r = 1.0f;
       GOAL_points.color.a = 1.0;
-      std::list<ufo::math::Vector3>::iterator it_comeon_visualizer3;	
+      std::list<node>::iterator it_comeon_visualizer3;	
       for(it_comeon_visualizer3 = myGoals.begin(); it_comeon_visualizer3 != myGoals.end(); it_comeon_visualizer3++){
         geometry_msgs::Point p;
-        p.x = it_comeon_visualizer3->x();
-        p.y = it_comeon_visualizer3->y();
-        p.z = it_comeon_visualizer3->z();
+        p.x = it_comeon_visualizer3->point->x();
+        p.y = it_comeon_visualizer3->point->y();
+        p.z = it_comeon_visualizer3->point->z();
         GOAL_points.points.push_back(p);
       }
       goal_pub.publish(GOAL_points);
