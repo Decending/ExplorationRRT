@@ -96,28 +96,28 @@ struct node{
           ufo::geometry::Frustum frustYP(*point, targetYP, upwards, vertical_angle, horizontal_angle, near_distance, far_distance);
           ufo::geometry::Frustum frustYN(*point, targetYN, upwards, vertical_angle, horizontal_angle, near_distance, far_distance);
         
-          for (auto it = map.beginLeaves(frustXP, false, false, true, false, 0), it_end = map.endLeaves(); it != it_end; ++it){
+          for (auto it = map.beginLeaves(frustXP, false, false, true, false, 4), it_end = map.endLeaves(); it != it_end; ++it){
             ufo::math::Vector3 end_point(it.getX(), it.getY(), it.getZ());
             ufo::geometry::LineSegment myLine(*point, end_point);
             if(!isInCollision(map, myLine, true, false, false, 4)){
               myHits.push_back(&end_point);
             }
           }
-          for (auto it = map.beginLeaves(frustXN, false, false, true, false, 0), it_end = map.endLeaves(); it != it_end; ++it){
+          for (auto it = map.beginLeaves(frustXN, false, false, true, false, 4), it_end = map.endLeaves(); it != it_end; ++it){
             ufo::math::Vector3 end_point(it.getX(), it.getY(), it.getZ());
             ufo::geometry::LineSegment myLine(*point, end_point);
             if(!isInCollision(map, myLine, true, false, false, 4)){
               myHits.push_back(&end_point);
             }
           }
-          for (auto it = map.beginLeaves(frustYP, false, false, true, false, 0), it_end = map.endLeaves(); it != it_end; ++it){
+          for (auto it = map.beginLeaves(frustYP, false, false, true, false, 4), it_end = map.endLeaves(); it != it_end; ++it){
             ufo::math::Vector3 end_point(it.getX(), it.getY(), it.getZ());
             ufo::geometry::LineSegment myLine(*point, end_point);
             if(!isInCollision(map, myLine, true, false, false, 4)){
               myHits.push_back(&end_point);
             }
           }
-          for (auto it = map.beginLeaves(frustYN, false, false, true, false, 0), it_end = map.endLeaves(); it != it_end; ++it){
+          for (auto it = map.beginLeaves(frustYN, false, false, true, false, 4), it_end = map.endLeaves(); it != it_end; ++it){
             ufo::math::Vector3 end_point(it.getX(), it.getY(), it.getZ());
             ufo::geometry::LineSegment myLine(*point, end_point);
             if(!isInCollision(map, myLine, true, false, false, 4)){
@@ -143,10 +143,37 @@ struct node{
         }
       };
       
+      bool findPathImprovement(struct node* targetNode, ufo::map::OccupancyMapColor const& map){
+        bool improvementFound;
+        if(myParent != nullptr){
+          improvementFound = myParent->findPathImprovement(targetNode, map);
+        }else{
+          ufo::geometry::LineSegment myLine(*(targetNode->point), *point);
+          if(!isInCollision(map, myLine, true, false, true, 4)){
+            targetNode->addParent(this);
+            return true;
+          }else{
+            return false;
+          }
+        }
+        if(!improvementFound){
+          ufo::geometry::LineSegment myLine(*(targetNode->point), *point);
+          if(!isInCollision(map, myLine, true, false, true, 4)){
+            targetNode->addParent(this);
+            improvementFound = findPathImprovement(this, map);
+            return improvementFound;
+          }else{
+            return false;
+          }
+        }else{
+          return improvementFound;
+        }
+      }
+      
       bool isInCollision(ufo::map::OccupancyMapColor const& map, 
                    ufo::geometry::BoundingVar const& bounding_volume, 
                    bool occupied_space = true, bool free_space = false,
-                   bool unknown_space = false, ufo::map::DepthType min_depth = 0){
+                   bool unknown_space = false, ufo::map::DepthType min_depth = 4){
         // Iterate through all leaf nodes that intersects the bounding volume
         for (auto it = map.beginLeaves(bounding_volume, occupied_space, 
                                  free_space, unknown_space, false, min_depth), 
@@ -161,13 +188,14 @@ struct node{
 
 // Variables of interest
 int NUMBER_OF_NODES = 3000;
-int NUMBER_OF_GOALS = 3;
+int NUMBER_OF_GOALS = 5;
 int NUMBER_OF_ITTERATIONS = 3000;
 bool RUN_BY_NODES = true;
 double SENSOR_RANGE = 2;
+double SCALER_INFORMATION_GAIN = 1;
 int itterations;
 int STEP_LENGTH = 1;
-float SCALER_AABB = 10;
+float SCALER_AABB = 20;
 float SCALER_X = SCALER_AABB;
 float SCALER_Y = SCALER_AABB;
 float SCALER_Z = SCALER_AABB;
@@ -196,7 +224,7 @@ std::list<struct node*> PATH{};
 std::list<struct node> myGoals{};
 std::list<ufo::math::Vector3> hits{};
 
-void tuneGeneration(ufo::map::OccupancyMapColor const& map, bool occupied_space, bool free_space, bool unknown_space, ufo::map::DepthType min_depth = 0){
+void tuneGeneration(ufo::map::OccupancyMapColor const& map, bool occupied_space, bool free_space, bool unknown_space, ufo::map::DepthType min_depth = 4){
   highest_x = std::numeric_limits<float>::min();
   highest_y = std::numeric_limits<float>::min();
   highest_z = std::numeric_limits<float>::min();
@@ -228,6 +256,12 @@ void tuneGeneration(ufo::map::OccupancyMapColor const& map, bool occupied_space,
   SCALER_Z = highest_z - lowest_z;
 }
 
+void pathImprovements(){
+  for(std::list<node>::iterator it_goal = myGoals.begin(); it_goal != myGoals.end(); it_goal++){
+    
+  }
+}
+
 void findShortestPath(){
   for(std::list<node>::iterator it_goals = myGoals.begin(); it_goals != myGoals.end(); it_goals++){
     struct node* chosenNode;
@@ -249,7 +283,7 @@ void findShortestPath(){
 bool isInCollision(ufo::map::OccupancyMapColor const& map, 
                    ufo::geometry::BoundingVar const& bounding_volume, 
                    bool occupied_space = true, bool free_space = false,
-                   bool unknown_space = false, ufo::map::DepthType min_depth = 0)
+                   bool unknown_space = false, ufo::map::DepthType min_depth = 4)
 {
   // Iterate through all leaf nodes that intersects the bounding volume
   for (auto it = map.beginLeaves(bounding_volume, occupied_space, 
@@ -272,16 +306,16 @@ void generateGoals(ufo::map::OccupancyMapColor const& map){
     float z = lowest_z + abs(1024 * rand () / (RAND_MAX + 1.0)) * SCALER_Z;
     ufo::math::Vector3 goal(x, y, z);
     ufo::geometry::Sphere goal_sphere(goal, radius);
-    if(!isInCollision(myMap, goal_sphere, true, false, true, 0) and isInCollision(myMap, goal_sphere, false, true, false, 0)){
+    if(!isInCollision(myMap, goal_sphere, true, false, true, 4) and isInCollision(myMap, goal_sphere, false, true, false, 4)){
       ufo::math::Vector3 min_point(x - SENSOR_RANGE, y - SENSOR_RANGE, z - SENSOR_RANGE);
       ufo::math::Vector3 max_point(x + SENSOR_RANGE, y + SENSOR_RANGE, z + SENSOR_RANGE);
       ufo::math::Vector3 position(position_x, position_y, position_z);
       ufo::geometry::AABB aabb(min_point, max_point);
-      for (auto it = map.beginLeaves(aabb, false, false, true, false, 0), it_end = map.endLeaves(); it != it_end; ++it) {
+      for (auto it = map.beginLeaves(aabb, false, false, true, false, 4), it_end = map.endLeaves(); it != it_end; ++it) {
         if (it.isUnknown()) {
           ufo::math::Vector3 unknownNode(it.getX(), it.getY(), it.getZ());
           ufo::geometry::LineSegment myLine(goal, unknownNode);
-          if(!isInCollision(map, myLine, true, false, false, 0)){
+          if(!isInCollision(map, myLine, true, false, false, 4)){
             node newGoal(x, y, z);
             myGoals.push_back(newGoal);
             break;
@@ -303,12 +337,13 @@ void generateGoals(ufo::map::OccupancyMapColor const& map){
 };
 
 void setPath(){
-  int totalHits = 0;
-  int newHits = 0;
+  double totalCost = std::numeric_limits<float>::max();
+  double newCost = std::numeric_limits<float>::max();
   for(std::list<node>::iterator it_goal = myGoals.begin(); it_goal != myGoals.end(); it_goal++){
-    newHits = it_goal->findInformationGain(SCALER_AABB, myMap);
-    if(newHits > totalHits){
-      totalHits = newHits;
+    it_goal->findPathImprovement(&*it_goal, myMap);
+    newCost = it_goal->sumDistance() - SCALER_INFORMATION_GAIN * (it_goal->findInformationGain(SCALER_AABB, myMap));
+    if(newCost < totalCost){
+      totalCost = newCost;
       goalNode = &*it_goal;
     }
   }
@@ -330,7 +365,7 @@ void generateRRT(){
     float z = lowest_z + abs(1024 * rand () / (RAND_MAX + 1.0)) * SCALER_Z;
     ufo::math::Vector3 random_point(x, y, z);
     // If the point is not occupied, continue
-    if(!isInCollision(myMap, random_point, true, false, true, 0) and isInCollision(myMap, random_point, false, true, false, 0)){
+    if(!isInCollision(myMap, random_point, true, false, true, 4) and isInCollision(myMap, random_point, false, true, false, 4)){
       // TO DO: check for unknown within sensor_range
       //Find closest node in the RRT-TREE, set up the relation and add to tree
       float distance = std::numeric_limits<float>::max();
@@ -346,7 +381,7 @@ void generateRRT(){
       };
       ufo::math::Vector3 start_point(parent->point->x(), parent->point->y(), parent->point->z());
       ufo::geometry::LineSegment myLine(random_point, start_point);
-      if(!isInCollision(myMap, myLine, true, false, true, 0)) {
+      if(!isInCollision(myMap, myLine, true, false, true, 4)) {
         node new_node(x, y, z);
         new_node.addParent(parent);
         parent->addChild(&new_node);
@@ -425,14 +460,12 @@ int main(int argc, char *argv[])
   while(ros::ok()){
     if(map_received and not RRT_created){
       itterations = 0;
-      tuneGeneration(myMap, false, true, false, 0);
+      tuneGeneration(myMap, false, true, false, 4);
       myGoals.clear();
       generateGoals(myMap);
       itterations = 0;
       auto start = high_resolution_clock::now();
-      std::cout << "glider in 0" << std::endl;
       generateRRT();
-      std::cout << "glider in 1" << std::endl;
       auto stop = high_resolution_clock::now();
       auto duration = duration_cast<microseconds>(stop - start);
       if(itterations != 100000){
@@ -498,15 +531,14 @@ int main(int argc, char *argv[])
       PATH_points.color.a = 1.0;
       PATH_line_list.color.b = 1.0;
       PATH_line_list.color.a = 1.0;
-      std::cout << "glider in 2" << std::endl;
+      auto start = high_resolution_clock::now();
       setPath();
-      std::cout << "glider in 3" << std::endl;
       PATH.clear();
-      std::cout << "glider in 3.5" << std::endl;
       goalNode->getPath(&PATH);
-      std::cout << "glider in 4" << std::endl;
+      auto stop = high_resolution_clock::now();
+      auto duration = duration_cast<microseconds>(stop - start);
+      cout << "\nExecution time: " << duration.count() << " micro seconds for " << myGoals.size() << " path." << endl;
       PATH.push_back(goalNode);
-      std::cout << "glider in 5" << std::endl;
       std::list<node*>::iterator it_comeon_visualizer2;	
       for(it_comeon_visualizer2 = PATH.begin(); it_comeon_visualizer2 != PATH.end(); it_comeon_visualizer2++){
         geometry_msgs::Point p;
