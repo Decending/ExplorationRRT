@@ -24,7 +24,7 @@ struct node{
       double distanceToParent;
       std::list<struct node*> myChilds{};
       std::list<struct node*> myPath{};
-      std::list<ufo::math::Vector3*> myHits{};
+      std::list<ufo::math::Vector3> myHits{};
       double distanceToGoal;
       node(float x, float y, float z){
          point = new ufo::math::Vector3(x, y, z);
@@ -100,44 +100,54 @@ struct node{
             ufo::math::Vector3 end_point(it.getX(), it.getY(), it.getZ());
             ufo::geometry::LineSegment myLine(*point, end_point);
             if(!isInCollision(map, myLine, true, false, false, 4)){
-              myHits.push_back(&end_point);
+              myHits.push_back(end_point);
             }
           }
           for (auto it = map.beginLeaves(frustXN, false, false, true, false, 4), it_end = map.endLeaves(); it != it_end; ++it){
             ufo::math::Vector3 end_point(it.getX(), it.getY(), it.getZ());
             ufo::geometry::LineSegment myLine(*point, end_point);
             if(!isInCollision(map, myLine, true, false, false, 4)){
-              myHits.push_back(&end_point);
+              myHits.push_back(end_point);
             }
           }
           for (auto it = map.beginLeaves(frustYP, false, false, true, false, 4), it_end = map.endLeaves(); it != it_end; ++it){
             ufo::math::Vector3 end_point(it.getX(), it.getY(), it.getZ());
             ufo::geometry::LineSegment myLine(*point, end_point);
             if(!isInCollision(map, myLine, true, false, false, 4)){
-              myHits.push_back(&end_point);
+              myHits.push_back(end_point);
             }
           }
           for (auto it = map.beginLeaves(frustYN, false, false, true, false, 4), it_end = map.endLeaves(); it != it_end; ++it){
             ufo::math::Vector3 end_point(it.getX(), it.getY(), it.getZ());
             ufo::geometry::LineSegment myLine(*point, end_point);
             if(!isInCollision(map, myLine, true, false, false, 4)){
-              myHits.push_back(&end_point);
+              myHits.push_back(end_point);
             }
           }
           if(myParent != nullptr){
             myParent->findInformationGain(SCALER_AABB, map);
           }
         }
-        std::list<ufo::math::Vector3*> myTotalHits{};
+        std::list<ufo::math::Vector3> myTotalHits{};
         addHits(&myTotalHits);
-        myTotalHits.sort();
-        myTotalHits.unique();
         int hits = myTotalHits.size();
         return hits;
       }
       
-      void addHits(std::list<ufo::math::Vector3*>* hitList){
-        hitList->merge(myHits);
+      void addHits(std::list<ufo::math::Vector3>* hitList){
+        bool add = true;
+        for(auto it = myHits.begin(), it_end = myHits.end(); it != it_end; ++it){
+          for(auto it2 = hitList->begin(), it_end2 = hitList->end(); it2 != it_end2; ++it2){
+            if(it->x() == it2->x() and it->y() == it2->y() and it->z() == it2->z()){
+              add = false;
+              break;
+            }
+          }
+          if(add){
+            hitList->push_back(*it);
+          }
+          add = true;
+        }
         if(myParent != nullptr){
           myParent->addHits(hitList);
         }
@@ -188,7 +198,7 @@ struct node{
 
 // Variables of interest
 int NUMBER_OF_NODES = 3000;
-int NUMBER_OF_GOALS = 5;
+int NUMBER_OF_GOALS = 40;
 int NUMBER_OF_ITTERATIONS = 3000;
 bool RUN_BY_NODES = true;
 double SENSOR_RANGE = 2;
@@ -222,7 +232,7 @@ ufo::map::OccupancyMapColor myMap(0.7);
 std::list<struct node> RRT_TREE{};
 std::list<struct node*> PATH{};
 std::list<struct node> myGoals{};
-std::list<ufo::math::Vector3> hits{};
+std::list<ufo::math::Vector3*> hits{};
 
 void tuneGeneration(ufo::map::OccupancyMapColor const& map, bool occupied_space, bool free_space, bool unknown_space, ufo::map::DepthType min_depth = 4){
   highest_x = std::numeric_limits<float>::min();
@@ -342,6 +352,7 @@ void setPath(){
   for(std::list<node>::iterator it_goal = myGoals.begin(); it_goal != myGoals.end(); it_goal++){
     it_goal->findPathImprovement(&*it_goal, myMap);
     newCost = it_goal->sumDistance() - SCALER_INFORMATION_GAIN * (it_goal->findInformationGain(SCALER_AABB, myMap));
+    std::cout << "My hits = " << it_goal->findInformationGain(SCALER_AABB, myMap) << std::endl;
     if(newCost < totalCost){
       totalCost = newCost;
       goalNode = &*it_goal;
