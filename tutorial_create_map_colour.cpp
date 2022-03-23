@@ -289,12 +289,12 @@ void findShortestPath(){
     struct node* chosenNode;
     double distance = std::numeric_limits<double>::max();
     for(std::list<node>::iterator it_RRT = RRT_TREE.begin(); it_RRT != RRT_TREE.end(); it_RRT++){
-      ufo::geometry::LineSegment myLine(*(it_goals->point), *(it_RRT->point));
-      if(!isInCollision(myMap, myLine, true, false, true, 0)){
-        double distanceNodeToGoal = sqrt(pow(it_RRT->point->x() - it_goals->point->x(), 2) + pow(it_RRT->point->y() - it_goals->point->y(), 2) + pow(it_RRT->point->z() - it_goals->point->z(), 2));
-        double distanceToNode = it_RRT->sumDistance();
-        double totalDistance = distanceNodeToGoal + distanceToNode;
-        if(totalDistance < distance){
+      double distanceNodeToGoal = sqrt(pow(it_RRT->point->x() - it_goals->point->x(), 2) + pow(it_RRT->point->y() - it_goals->point->y(), 2) + pow(it_RRT->point->z() - it_goals->point->z(), 2));
+      double distanceToNode = it_RRT->sumDistance();
+      double totalDistance = distanceNodeToGoal + distanceToNode;
+      if(totalDistance < distance){
+        ufo::geometry::LineSegment myLine(*(it_goals->point), *(it_RRT->point));
+        if(!isInCollision(myMap, myLine, true, false, true, 0)){
           distance = totalDistance;
           chosenNode = &*it_RRT;
         }
@@ -488,7 +488,11 @@ int main(int argc, char *argv[])
       }else{
         cout << "\nTimeout after " << duration.count() << " micro seconds for " << itterations << " itterations." << endl;
       }
+      auto start2 = high_resolution_clock::now();
       findShortestPath();
+      auto stop2 = high_resolution_clock::now();
+      auto duration2 = duration_cast<microseconds>(stop2 - start2);
+      cout << "\nExecution time: " << duration2.count() << ", this is to find the shortest paths to our goals" << endl;
       RRT_created = true;
       itterations = 0;
     }
