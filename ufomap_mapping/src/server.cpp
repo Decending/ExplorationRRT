@@ -56,7 +56,7 @@ Server::Server(ros::NodeHandle &nh, ros::NodeHandle &nh_priv)
     : nh_(nh), nh_priv_(nh_priv), tf_listener_(tf_buffer_), cs_(nh_priv)
 {
 	// Set up map
-	double resolution = nh_priv_.param("resolution", 0.05);
+	double resolution = nh_priv_.param("resolution", 0.4);
 	ufo::map::DepthType depth_levels = nh_priv_.param("depth_levels", 16);
 
 	// Automatic pruning is disabled so we can work in multiple threads for subscribers,
@@ -140,7 +140,7 @@ void Server::cloudCallback(sensor_msgs::PointCloud2::ConstPtr const &msg)
 				    try {
 					    transform = ufomap_ros::rosToUfo(
 					        tf_buffer_
-					            .lookupTransform(frame_id_, robot_frame_id_, msg->header.stamp,
+					            .lookupTransform("odom_shafter", robot_frame_id_, msg->header.stamp,
 					                             transform_timeout_)
 					            .transform);
 				    } catch (tf2::TransformException &ex) {
