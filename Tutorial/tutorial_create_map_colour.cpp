@@ -87,8 +87,8 @@ struct node{
           ufo::math::Vector3 upwards(point->x(), point->y(), point->z() + 1);
         
           //Angles
-          double vertical_angle = 15;
-          double horizontal_angle = 45;
+          double vertical_angle = 0.16;
+          double horizontal_angle = 0.5;
         
           //Distances
           double near_distance = 0.2;
@@ -132,7 +132,7 @@ struct node{
               myHits.push_back(end_point);
             }
           }
-          std::cout << "My checks: " << checks << std::endl;
+          //std::cout << "My checks: " << checks << std::endl;
           if(myParent != nullptr){
             myParent->findInformationGain(SCALER_AABB, map);
           }
@@ -209,6 +209,7 @@ struct node{
 int NUMBER_OF_NODES = 3000;
 int NUMBER_OF_GOALS = 40;
 int NUMBER_OF_ITTERATIONS = 3000;
+float DISTANCE_BETWEEN_NODES = 1;
 bool RUN_BY_NODES = true;
 double SENSOR_RANGE = 2;
 double SCALER_INFORMATION_GAIN = 1;
@@ -243,6 +244,42 @@ std::list<struct node> RRT_TREE{};
 std::list<struct node*> PATH{};
 std::list<struct node> myGoals{};
 std::list<ufo::math::Vector3> hits{};
+
+void linSpace(node* givenNode, float givenDistance){
+  //ufo::math::Vector3 newVector = *(givenNode->myParent->point) - *(givenNode->point);
+  //std::cout << "här börjar linSpace" << std::endl;
+  
+  ufo::math::Vector3 newVector(givenNode->myParent->point->x() - givenNode->point->x(), givenNode->myParent->point->y() - givenNode->point->y(), givenNode->myParent->point->z() - givenNode->point->z());
+  //std::cout << "my newVector: " << newVector.x() << ", " << newVector.y() << ", " << newVector.z() << std::endl;
+  float distance = newVector.norm();
+  float itterations = (distance / givenDistance);
+  //std::cout << "my distance: " << distance << std::endl;
+  //std::cout << "my givenDistance: " << givenDistance << std::endl;
+  //std::cout << "my itterations: " << itterations << std::endl;
+  float part = givenDistance / distance;
+  float xStep = (givenNode->myParent->point->x() - givenNode->point->x()) * part;
+  float yStep = (givenNode->myParent->point->y() - givenNode->point->y()) * part;
+  float zStep = (givenNode->myParent->point->z() - givenNode->point->z()) * part;
+  node* parent = givenNode->myParent;
+  node* nextNode = givenNode->myParent;
+  for(int i = 1; i < itterations; i++){
+    //std::cout << "\nnewPoints x, y, z: " << parent->point->x() << ", " << parent->point->y() << ", " << parent->point->z() << std::endl;
+    node* newPoint = new node(givenNode->point->x() + i * xStep, givenNode->point->y() + i * yStep, givenNode->point->z() + i * zStep);
+    //std::cout << "newPoints x, y, z: " << newPoint->point->x() << ", " << newPoint->point->y() << ", " << newPoint->point->z() << std::endl;
+    newPoint->addParent(parent);
+    //std::cout << "newPoints x, y, z: " << newPoint->myParent->point->x() << ", " << newPoint->myParent->point->y() << ", " << newPoint->myParent->point->z() << std::endl;
+    parent = newPoint;
+    RRT_TREE.push_back(*newPoint);
+  }
+  givenNode->addParent(parent);
+  if(nextNode->myParent != nullptr){
+    linSpace(nextNode, givenDistance);
+  }
+  //std::cout << "kommer ut" << std::endl;
+  /*if(givenNode->myParent != nullptr){
+    linSpace(givenNode->myParent, givenDistance);
+  }*/
+}
 
 void tuneGeneration(ufo::map::OccupancyMapColor const& map, bool occupied_space, bool free_space, bool unknown_space, ufo::map::DepthType min_depth = 4){
   highest_x = std::numeric_limits<float>::min();
@@ -333,8 +370,8 @@ void generateGoals(ufo::map::OccupancyMapColor const& map){
           ufo::math::Vector3 unknownNode(it.getX(), it.getY(), it.getZ());
           ufo::geometry::LineSegment myLine(goal, unknownNode);
           if(!isInCollision(map, myLine, true, false, false, 4)){
-            node newGoal(x, y, z);
-            myGoals.push_back(newGoal);
+            node* newGoal = new node(x, y, z);
+            myGoals.push_back(*newGoal);
             break;
           }
         }
@@ -360,7 +397,12 @@ void setPath(){
   double newCost = std::numeric_limits<float>::max();
   for(std::list<node>::iterator it_goal = myGoals.begin(); it_goal != myGoals.end(); it_goal++){
     it_goal->findPathImprovement(&*it_goal, myMap);
+    linSpace(&*it_goal, DISTANCE_BETWEEN_NODES);
+    it_goal->findPathImprovement(&*it_goal, myMap);
+    //std::cout << "Krashar efter cost calc?" << std::endl;
     newCost = it_goal->sumDistance() - SCALER_INFORMATION_GAIN * (it_goal->findInformationGain(SCALER_AABB, myMap));
+    linSpace(&*it_goal, DISTANCE_BETWEEN_NODES);
+    //std::cout << "naej" << std::endl;
     //std::cout << "My hits = " << it_goal->findInformationGain(SCALER_AABB, myMap) << std::endl;
     if(newCost < totalCost){
       totalCost = newCost;
@@ -370,7 +412,6 @@ void setPath(){
 }
 
 void generateRRT(){
-  int loopCounter = 0;
   RRT_TREE.clear();
   std::cout << "Building RRT-tree" << std::endl;
   float step_length = 1;
@@ -386,37 +427,32 @@ void generateRRT(){
     float z = lowest_z + abs(1024 * rand () / (RAND_MAX + 1.0)) * SCALER_Z;
     ufo::math::Vector3 random_point(x, y, z);
     // If the point is not occupied, continue
-    if(!isInCollision(myMap, random_point, true, false, true, 4) and isInCollision(myMap, random_point, false, true, false, 4)){
+    if(!isInCollision(myMap, random_point, true, false, true, 0) and isInCollision(myMap, random_point, false, true, false, 0)){
       // TO DO: check for unknown within sensor_range
       //Find closest node in the RRT-TREE, set up the relation and add to tree
       float distance = std::numeric_limits<float>::max();
-      node* parent = nullptr;
+      node* parent;
       std::list<node>::iterator it_node;
-      loopCounter++;
       for(it_node = RRT_TREE.begin(); it_node != RRT_TREE.end(); it_node++){
         ufo::math::Vector3 direction = random_point - *(it_node->point);
-        double new_distance = sqrt((x - it_node->point->x()) + (y - it_node->point->y()) + (z - it_node->point->z()));
-        //std::cout << "This is new_distance: " << new_distance << std::endl;
+        double new_distance = abs(direction.norm());
         if(new_distance < distance){
           distance = new_distance;
           parent = &*it_node;
         }
       };
-      if(parent != nullptr){
-        ufo::math::Vector3 start_point(parent->point->x(), parent->point->y(), parent->point->z());
-        ufo::geometry::LineSegment myLine(random_point, start_point);
-        if(!isInCollision(myMap, myLine, true, false, true, 4)) {
-          node new_node(x, y, z);
-          new_node.addParent(parent);
-          parent->addChild(&new_node);
-          RRT_TREE.push_back(new_node);
-        }
+      ufo::math::Vector3 start_point(parent->point->x(), parent->point->y(), parent->point->z());
+      ufo::geometry::LineSegment myLine(random_point, start_point);
+      if(!isInCollision(myMap, myLine, true, false, true, 0)) {
+        node new_node(x, y, z);
+        new_node.addParent(parent);
+        parent->addChild(&new_node);
+        RRT_TREE.push_back(new_node);
       }
     };
     // find closest node in the RRT-TREE
     itterations++;
   };
-  std::cout << "This is our loop counter: " << loopCounter << std::endl;
   std::cout << "RRT-tree built successfully" << std::endl;
   
   if(RUN_BY_NODES){
