@@ -215,7 +215,7 @@ double SENSOR_RANGE = 2;
 double SCALER_INFORMATION_GAIN = 1;
 int itterations;
 int STEP_LENGTH = 1;
-float SCALER_AABB = 10;
+float SCALER_AABB = 20;
 float SCALER_X = SCALER_AABB;
 float SCALER_Y = SCALER_AABB;
 float SCALER_Z = SCALER_AABB;
@@ -241,7 +241,8 @@ float highest_z;
 // Create a colored UFOMap
 ufo::map::OccupancyMapColor myMap(0.4);
 std::list<struct node> RRT_TREE{};
-std::list<struct node*> PATH{};
+std::list<struct node*> CHOSEN_PATH{};
+std::list<struct node*> ALL_PATH{};
 std::list<struct node> myGoals{};
 std::list<ufo::math::Vector3> hits{};
 
@@ -508,7 +509,8 @@ int main(int argc, char *argv[])
   ros::init(argc, argv, "RRT_TREE");
   ros::NodeHandle nh;
   ros::Publisher points_pub = nh.advertise<visualization_msgs::Marker>("RRT_NODES", 1);
-  ros::Publisher path_pub = nh.advertise<visualization_msgs::Marker>("RRT_PATH", 1);
+  ros::Publisher chosen_path_pub = nh.advertise<visualization_msgs::Marker>("CHOSEN_RRT_PATH", 1);
+  ros::Publisher all_path_pub = nh.advertise<visualization_msgs::Marker>("RRT_PATHS", 1);
   ros::Publisher goal_pub = nh.advertise<visualization_msgs::Marker>("RRT_GOALS", 1);
   ros::Publisher map_pub = nh.advertise<ufomap_msgs::UFOMapStamped>("goe_map", 11);
   ros::Subscriber map_sub = nh.subscribe("ufomap_mapping_server_node/map_depth_4", 1, mapCallback);
@@ -552,7 +554,7 @@ int main(int argc, char *argv[])
     }
 
     if(map_received and RRT_created){
-      visualization_msgs::Marker RRT_points, RRT_line_list, PATH_points, PATH_line_list, GOAL_points, HITS_points;
+      visualization_msgs::Marker RRT_points, RRT_line_list, CHOSEN_PATH_points, CHOSEN_PATH_line_list, PATH_points, PATH_line_list, GOAL_points, HITS_points;
     
       RRT_points.header.frame_id = RRT_line_list.header.frame_id = "odom_shafter";
       RRT_points.ns = "points";
@@ -589,6 +591,47 @@ int main(int argc, char *argv[])
       
       if(!fetched_path and RRT_created){
       fetched_path = true;
+      CHOSEN_PATH_points.header.frame_id = CHOSEN_PATH_line_list.header.frame_id = "odom_shafter";
+      CHOSEN_PATH_points.ns = "points";
+      CHOSEN_PATH_points.action = visualization_msgs::Marker::ADD;
+      CHOSEN_PATH_points.pose.orientation.w = 1.0;
+      CHOSEN_PATH_points.id = 0;
+      CHOSEN_PATH_line_list.id = 1;
+      CHOSEN_PATH_points.type = visualization_msgs::Marker::POINTS;
+      CHOSEN_PATH_line_list.type = visualization_msgs::Marker::LINE_LIST;
+      CHOSEN_PATH_points.scale.x = 0.2;
+      CHOSEN_PATH_points.scale.y = 0.2;
+      CHOSEN_PATH_line_list.scale.x = 0.1;
+      CHOSEN_PATH_points.color.g = 1.0f;
+      CHOSEN_PATH_points.color.a = 1.0;
+      CHOSEN_PATH_line_list.color.b = 1.0;
+      CHOSEN_PATH_line_list.color.a = 1.0;
+      auto start = high_resolution_clock::now();
+      setPath();
+      CHOSEN_PATH.clear();
+      goalNode->getPath(&CHOSEN_PATH);
+      auto stop = high_resolution_clock::now();
+      auto duration = duration_cast<microseconds>(stop - start);
+      cout << "\nExecution time: " << duration.count() << " micro seconds for " << myGoals.size() << " path/s." << endl;
+      CHOSEN_PATH.push_back(goalNode);
+      std::list<node*>::iterator it_comeon_visualizer2;	
+      for(it_comeon_visualizer2 = CHOSEN_PATH.begin(); it_comeon_visualizer2 != CHOSEN_PATH.end(); it_comeon_visualizer2++){
+        geometry_msgs::Point p;
+        p.x = (*it_comeon_visualizer2)->point->x();
+        p.y = (*it_comeon_visualizer2)->point->y();
+        p.z = (*it_comeon_visualizer2)->point->z();
+        CHOSEN_PATH_points.points.push_back(p);
+        if((*it_comeon_visualizer2)->myParent != nullptr){
+          CHOSEN_PATH_line_list.points.push_back(p);
+          p.x = (*it_comeon_visualizer2)->myParent->point->x();
+          p.y = (*it_comeon_visualizer2)->myParent->point->y();
+          p.z = (*it_comeon_visualizer2)->myParent->point->z();
+          CHOSEN_PATH_line_list.points.push_back(p);
+        }
+      }
+      chosen_path_pub.publish(CHOSEN_PATH_points);
+      chosen_path_pub.publish(CHOSEN_PATH_line_list);
+      
       PATH_points.header.frame_id = PATH_line_list.header.frame_id = "odom_shafter";
       PATH_points.ns = "points";
       PATH_points.action = visualization_msgs::Marker::ADD;
@@ -604,31 +647,30 @@ int main(int argc, char *argv[])
       PATH_points.color.a = 1.0;
       PATH_line_list.color.b = 1.0;
       PATH_line_list.color.a = 1.0;
-      auto start = high_resolution_clock::now();
-      setPath();
-      PATH.clear();
-      goalNode->getPath(&PATH);
-      auto stop = high_resolution_clock::now();
-      auto duration = duration_cast<microseconds>(stop - start);
-      cout << "\nExecution time: " << duration.count() << " micro seconds for " << myGoals.size() << " path/s." << endl;
-      PATH.push_back(goalNode);
-      std::list<node*>::iterator it_comeon_visualizer2;	
-      for(it_comeon_visualizer2 = PATH.begin(); it_comeon_visualizer2 != PATH.end(); it_comeon_visualizer2++){
+      std::list<node>::iterator it_comeon_visualizer5;
+      ALL_PATH.clear();
+      for(it_comeon_visualizer5 = myGoals.begin(); it_comeon_visualizer5 != myGoals.end(); it_comeon_visualizer5++){
+        (*it_comeon_visualizer5).getPath(&ALL_PATH);
+        ALL_PATH.push_back((&*it_comeon_visualizer5));
+      }
+      std::cout << ALL_PATH.size() << std::endl;
+      std::list<node*>::iterator it_comeon_visualizer6;	
+      for(it_comeon_visualizer6 = ALL_PATH.begin(); it_comeon_visualizer6 != ALL_PATH.end(); it_comeon_visualizer6++){
         geometry_msgs::Point p;
-        p.x = (*it_comeon_visualizer2)->point->x();
-        p.y = (*it_comeon_visualizer2)->point->y();
-        p.z = (*it_comeon_visualizer2)->point->z();
+        p.x = (*it_comeon_visualizer6)->point->x();
+        p.y = (*it_comeon_visualizer6)->point->y();
+        p.z = (*it_comeon_visualizer6)->point->z();
         PATH_points.points.push_back(p);
-        if((*it_comeon_visualizer2)->myParent != nullptr){
+        if((*it_comeon_visualizer6)->myParent != nullptr){
           PATH_line_list.points.push_back(p);
-          p.x = (*it_comeon_visualizer2)->myParent->point->x();
-          p.y = (*it_comeon_visualizer2)->myParent->point->y();
-          p.z = (*it_comeon_visualizer2)->myParent->point->z();
+          p.x = (*it_comeon_visualizer6)->myParent->point->x();
+          p.y = (*it_comeon_visualizer6)->myParent->point->y();
+          p.z = (*it_comeon_visualizer6)->myParent->point->z();
           PATH_line_list.points.push_back(p);
         }
       }
-      path_pub.publish(PATH_points);
-      path_pub.publish(PATH_line_list);
+      all_path_pub.publish(PATH_points);
+      all_path_pub.publish(PATH_line_list);
       }
       
       GOAL_points.header.frame_id = "odom_shafter";
