@@ -97,7 +97,7 @@ void Server::cloudCallback(sensor_msgs::PointCloud2::ConstPtr const &msg)
 	try {
 		transform =
 		    ufomap_ros::rosToUfo(tf_buffer_
-		                             .lookupTransform("odom_shafter", msg->header.frame_id,
+		                             .lookupTransform("pelican/pelican/velodyne", msg->header.frame_id,
 		                                              msg->header.stamp, transform_timeout_)
 		                             .transform);
 	} catch (tf2::TransformException &ex) {
@@ -140,7 +140,7 @@ void Server::cloudCallback(sensor_msgs::PointCloud2::ConstPtr const &msg)
 				    try {
 					    transform = ufomap_ros::rosToUfo(
 					        tf_buffer_
-					            .lookupTransform("odom_shafter", robot_frame_id_, msg->header.stamp,
+					            .lookupTransform("pelican/pelican/velodyne", robot_frame_id_, msg->header.stamp,
 					                             transform_timeout_)
 					            .transform);
 				    } catch (tf2::TransformException &ex) {
@@ -493,7 +493,7 @@ void Server::configCallback(ufomap_mapping::ServerConfig &config, uint32_t level
 	if (!cloud_sub_ || cloud_in_queue_size_ != config.cloud_in_queue_size) {
 		cloud_in_queue_size_ = config.cloud_in_queue_size;
 		cloud_sub_ =
-		    nh_.subscribe("velodyne_points", cloud_in_queue_size_, &Server::cloudCallback, this);
+		    nh_.subscribe("/pelican/velodyne_points", cloud_in_queue_size_, &Server::cloudCallback, this);
 	}
 
 	// Set up timer
