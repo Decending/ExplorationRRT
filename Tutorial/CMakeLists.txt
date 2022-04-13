@@ -213,3 +213,17 @@ target_link_libraries(Tutorial_create_map_colour_node UFO::Map)
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
+
+add_executable(optimizer ${CMAKE_SOURCE_DIR}/MAV/rrt/example_optimizer.c)
+
+# Add libraries to the executable
+target_link_libraries(optimizer ${CMAKE_SOURCE_DIR}/MAV/rrt/target/release/librrt.a)
+target_link_libraries(optimizer m)
+target_link_libraries(optimizer dl)
+target_link_libraries(optimizer pthread)
+
+add_custom_target(run
+    COMMAND optimizer
+    DEPENDS optimizer
+    WORKING_DIRECTORY ${CMAKE_PROJECT_DIR}
+)

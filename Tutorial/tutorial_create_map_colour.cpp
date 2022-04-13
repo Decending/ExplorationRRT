@@ -13,6 +13,7 @@
 #include <visualization_msgs/Marker.h>
 #include "nav_msgs/Odometry.h"
 #include <math.h>
+#include "MAV/rrt/rrt_bindings.h"
 
 using namespace std::chrono;
 using namespace std;
@@ -514,7 +515,7 @@ int main(int argc, char *argv[])
   ros::Publisher goal_pub = nh.advertise<visualization_msgs::Marker>("RRT_GOALS", 1);
   ros::Publisher map_pub = nh.advertise<ufomap_msgs::UFOMapStamped>("goe_map", 11);
   ros::Subscriber map_sub = nh.subscribe("ufomap_mapping_server_node/map_depth_4", 1, mapCallback);
-  ros::Subscriber sub = nh.subscribe("odometry/imu", 1, odomCallback);
+  ros::Subscriber sub = nh.subscribe("/pelican/ground_truth/odometry", 1, odomCallback);
   ros::Publisher hits_pub = nh.advertise<visualization_msgs::Marker>("HITS", 1);
   ros::Rate rate(10);
   
@@ -556,7 +557,7 @@ int main(int argc, char *argv[])
     if(map_received and RRT_created){
       visualization_msgs::Marker RRT_points, RRT_line_list, CHOSEN_PATH_points, CHOSEN_PATH_line_list, PATH_points, PATH_line_list, GOAL_points, HITS_points;
     
-      RRT_points.header.frame_id = RRT_line_list.header.frame_id = "odom_shafter";
+      RRT_points.header.frame_id = RRT_line_list.header.frame_id = "world";
       RRT_points.ns = "points";
       RRT_points.action = visualization_msgs::Marker::ADD;
       RRT_points.pose.orientation.w = 1.0;
@@ -591,7 +592,7 @@ int main(int argc, char *argv[])
       
       if(!fetched_path and RRT_created){
       fetched_path = true;
-      CHOSEN_PATH_points.header.frame_id = CHOSEN_PATH_line_list.header.frame_id = "odom_shafter";
+      CHOSEN_PATH_points.header.frame_id = CHOSEN_PATH_line_list.header.frame_id = "world";
       CHOSEN_PATH_points.ns = "points";
       CHOSEN_PATH_points.action = visualization_msgs::Marker::ADD;
       CHOSEN_PATH_points.pose.orientation.w = 1.0;
@@ -632,7 +633,7 @@ int main(int argc, char *argv[])
       chosen_path_pub.publish(CHOSEN_PATH_points);
       chosen_path_pub.publish(CHOSEN_PATH_line_list);
       
-      PATH_points.header.frame_id = PATH_line_list.header.frame_id = "odom_shafter";
+      PATH_points.header.frame_id = PATH_line_list.header.frame_id = "world";
       PATH_points.ns = "points";
       PATH_points.action = visualization_msgs::Marker::ADD;
       PATH_points.pose.orientation.w = 1.0;
@@ -673,7 +674,7 @@ int main(int argc, char *argv[])
       all_path_pub.publish(PATH_line_list);
       }
       
-      GOAL_points.header.frame_id = "odom_shafter";
+      GOAL_points.header.frame_id = "world";
       GOAL_points.ns = "points";
       GOAL_points.action = visualization_msgs::Marker::ADD;
       GOAL_points.pose.orientation.w = 1.0;
@@ -695,7 +696,7 @@ int main(int argc, char *argv[])
       
       hits.clear();
       goalNode->addHits(&hits);
-      HITS_points.header.frame_id = "odom_shafter";
+      HITS_points.header.frame_id = "world";
       HITS_points.ns = "points";
       HITS_points.action = visualization_msgs::Marker::ADD;
       HITS_points.pose.orientation.w = 1.0;
@@ -723,7 +724,7 @@ int main(int argc, char *argv[])
       //std::cout << "Map conversion success!" << std::endl;
       // Conversion was successful
       msg->header.stamp = ros::Time::now();
-      msg->header.frame_id = "odom_shafter";
+      msg->header.frame_id = "world";
       map_pub.publish(msg);					        
     }else{
       std::cout << "Map conversion failed!" << std::endl;
