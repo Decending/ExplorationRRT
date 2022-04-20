@@ -11,6 +11,8 @@
 #include <iostream>
 #include <chrono>
 #include <visualization_msgs/Marker.h>
+#include <geometry_msgs/PoseStamped.h>
+#include <nav_msgs/Path.h>
 #include "nav_msgs/Odometry.h"
 #include <math.h>
 #include "MAV/rrt/rrt_bindings.h"
@@ -226,6 +228,7 @@ bool RRT_created = false;
 bool GOALS_generated = false;
 bool position_received = false;
 bool fetched_path = false;
+bool newPath = false;
 float position_x = 0;
 float position_y = 0;
 float position_z = 0;
@@ -246,6 +249,7 @@ std::list<struct node*> CHOSEN_PATH{};
 std::list<struct node*> ALL_PATH{};
 std::list<struct node> myGoals{};
 std::list<ufo::math::Vector3> hits{};
+node* currentTarget;
 
 void linSpace(node* givenNode, float givenDistance){
   //ufo::math::Vector3 newVector = *(givenNode->myParent->point) - *(givenNode->point);
@@ -409,6 +413,7 @@ void setPath(){
     if(newCost < totalCost){
       totalCost = newCost;
       goalNode = &*it_goal;
+      newPath = true;
     }
   }
 }
@@ -419,6 +424,7 @@ void generateRRT(){
   float step_length = 1;
   float sensor_range = 2;
   node origin(position_x, position_y, position_z);
+  std::cout << "My guessed point: " << position_x << ", " << position_y << ", " << position_z << std::endl;
   origin.addParent(nullptr);
   RRT_TREE.push_back(origin);
   srand(time(0));
@@ -500,8 +506,8 @@ void mapCallback(ufomap_msgs::UFOMapStamped::ConstPtr const& msg)
 
 void odomCallback(const nav_msgs::Odometry::ConstPtr& msg){
   position_received = true;
-  position_x = msg->pose.pose.position.x;
-  position_y = msg->pose.pose.position.y;
+  position_x = msg->pose.pose.position.x + 3;
+  position_y = msg->pose.pose.position.y + 3;
   position_z = msg->pose.pose.position.z;
 }
 
@@ -510,7 +516,9 @@ int main(int argc, char *argv[])
   ros::init(argc, argv, "RRT_TREE");
   ros::NodeHandle nh;
   ros::Publisher points_pub = nh.advertise<visualization_msgs::Marker>("RRT_NODES", 1);
-  ros::Publisher chosen_path_pub = nh.advertise<visualization_msgs::Marker>("CHOSEN_RRT_PATH", 1);
+  ros::Publisher chosen_path_visualization_pub = nh.advertise<visualization_msgs::Marker>("CHOSEN_RRT_PATH_VISUALIZATION", 1);
+  // ros::Publisher chosen_path_pub = nh.advertise<nav_msgs::Path>("CHOSEN_RRT_PATH", 1);
+  ros::Publisher chosen_path_pub = nh.advertise<geometry_msgs::PoseStamped>("/pelican/reference", 1);
   ros::Publisher all_path_pub = nh.advertise<visualization_msgs::Marker>("RRT_PATHS", 1);
   ros::Publisher goal_pub = nh.advertise<visualization_msgs::Marker>("RRT_GOALS", 1);
   ros::Publisher map_pub = nh.advertise<ufomap_msgs::UFOMapStamped>("goe_map", 11);
@@ -518,7 +526,7 @@ int main(int argc, char *argv[])
   ros::Subscriber sub = nh.subscribe("/pelican/ground_truth/odometry", 1, odomCallback);
   ros::Publisher hits_pub = nh.advertise<visualization_msgs::Marker>("HITS", 1);
   ros::Rate rate(10);
-  
+  std::list<node*>::iterator path_itterator;
   /*auto start = high_resolution_clock::now();
   createRRT();
   auto stop = high_resolution_clock::now();
@@ -556,6 +564,8 @@ int main(int argc, char *argv[])
 
     if(map_received and RRT_created){
       visualization_msgs::Marker RRT_points, RRT_line_list, CHOSEN_PATH_points, CHOSEN_PATH_line_list, PATH_points, PATH_line_list, GOAL_points, HITS_points;
+      geometry_msgs::PoseStamped NEXT_POINT;
+      // nav_msgs::Path MY_CHOSEN_PATH;
     
       RRT_points.header.frame_id = RRT_line_list.header.frame_id = "world";
       RRT_points.ns = "points";
@@ -592,7 +602,7 @@ int main(int argc, char *argv[])
       
       if(!fetched_path and RRT_created){
       fetched_path = true;
-      CHOSEN_PATH_points.header.frame_id = CHOSEN_PATH_line_list.header.frame_id = "world";
+      CHOSEN_PATH_points.header.frame_id = CHOSEN_PATH_line_list.header.frame_id = "world"; //MY_CHOSEN_PATH.header.frame_id = "pelican/velodyne";
       CHOSEN_PATH_points.ns = "points";
       CHOSEN_PATH_points.action = visualization_msgs::Marker::ADD;
       CHOSEN_PATH_points.pose.orientation.w = 1.0;
@@ -615,6 +625,11 @@ int main(int argc, char *argv[])
       auto duration = duration_cast<microseconds>(stop - start);
       cout << "\nExecution time: " << duration.count() << " micro seconds for " << myGoals.size() << " path/s." << endl;
       CHOSEN_PATH.push_back(goalNode);
+      if(newPath){
+        newPath = false;
+        path_itterator = CHOSEN_PATH.begin();
+        currentTarget = *path_itterator;
+      };
       std::list<node*>::iterator it_comeon_visualizer2;	
       for(it_comeon_visualizer2 = CHOSEN_PATH.begin(); it_comeon_visualizer2 != CHOSEN_PATH.end(); it_comeon_visualizer2++){
         geometry_msgs::Point p;
@@ -622,6 +637,15 @@ int main(int argc, char *argv[])
         p.y = (*it_comeon_visualizer2)->point->y();
         p.z = (*it_comeon_visualizer2)->point->z();
         CHOSEN_PATH_points.points.push_back(p);
+        /* geometry_msgs::PoseStamped CHOSEN_PATH_POINT;
+        CHOSEN_PATH_POINT.pose.position.x = (*it_comeon_visualizer2)->point->x();
+        CHOSEN_PATH_POINT.pose.position.y = (*it_comeon_visualizer2)->point->y();
+        CHOSEN_PATH_POINT.pose.position.z = (*it_comeon_visualizer2)->point->z();
+        MY_CHOSEN_PATH.poses.push_back(CHOSEN_PATH_POINT);
+        CHOSEN_PATH_POINT.pose.orientation.x = 0;
+        CHOSEN_PATH_POINT.pose.orientation.y = 0;
+        CHOSEN_PATH_POINT.pose.orientation.z = 0;
+        CHOSEN_PATH_POINT.pose.orientation.w = 0; */
         if((*it_comeon_visualizer2)->myParent != nullptr){
           CHOSEN_PATH_line_list.points.push_back(p);
           p.x = (*it_comeon_visualizer2)->myParent->point->x();
@@ -630,8 +654,11 @@ int main(int argc, char *argv[])
           CHOSEN_PATH_line_list.points.push_back(p);
         }
       }
-      chosen_path_pub.publish(CHOSEN_PATH_points);
-      chosen_path_pub.publish(CHOSEN_PATH_line_list);
+      chosen_path_visualization_pub.publish(CHOSEN_PATH_points);
+      chosen_path_visualization_pub.publish(CHOSEN_PATH_line_list);
+      
+      // chosen_path_pub.publish(MY_CHOSEN_PATH);
+      
       
       PATH_points.header.frame_id = PATH_line_list.header.frame_id = "world";
       PATH_points.ns = "points";
@@ -672,6 +699,23 @@ int main(int argc, char *argv[])
       }
       all_path_pub.publish(PATH_points);
       all_path_pub.publish(PATH_line_list);
+      }
+      if(fetched_path){
+      if(sqrt(pow(position_x - currentTarget->point->x(), 2) + pow(position_y - currentTarget->point->y(), 2) + pow(position_z - currentTarget->point->z(), 2)) < 0.5){
+        path_itterator++;
+        currentTarget = *path_itterator;
+      }
+      geometry_msgs::PoseStamped nextPoint;
+      nextPoint.pose.position.x = (currentTarget)->point->x();
+      nextPoint.pose.position.y = (currentTarget)->point->y();
+      nextPoint.pose.position.z = (currentTarget)->point->z();
+      nextPoint.pose.orientation.x = 0;
+      nextPoint.pose.orientation.y = 0;
+      nextPoint.pose.orientation.z = 0;
+      nextPoint.pose.orientation.w = 0;
+      nextPoint.header.stamp = ros::Time::now();
+      nextPoint.header.frame_id = "world";
+      chosen_path_pub.publish(nextPoint);
       }
       
       GOAL_points.header.frame_id = "world";
@@ -716,10 +760,19 @@ int main(int argc, char *argv[])
       }
       hits_pub.publish(HITS_points);
 
-      ufomap_msgs::UFOMapStamped::Ptr msg(new ufomap_msgs::UFOMapStamped);
-      bool compress = false;
-      ufo::map::DepthType pub_depth = 0;
-      // Convert UFOMap to ROS message
+    itterations++;
+    if(itterations > 10){
+      itterations = 0;
+      fetched_path = false;
+      RRT_created = false;
+      GOALS_generated = false;
+      position_received = false;
+    }
+    }
+    ufomap_msgs::UFOMapStamped::Ptr msg(new ufomap_msgs::UFOMapStamped);
+    bool compress = false;
+    ufo::map::DepthType pub_depth = 0;
+    // Convert UFOMap to ROS message
     if (ufomap_msgs::ufoToMsg(myMap, msg->map, compress, pub_depth)) {
       //std::cout << "Map conversion success!" << std::endl;
       // Conversion was successful
@@ -728,15 +781,6 @@ int main(int argc, char *argv[])
       map_pub.publish(msg);					        
     }else{
       std::cout << "Map conversion failed!" << std::endl;
-    }
-    itterations++;
-    if(itterations > 100){
-      itterations = 0;
-      fetched_path = false;
-      RRT_created = false;
-      GOALS_generated = false;
-      position_received = false;
-    }
     }
     ros::spinOnce();
     rate.sleep();
