@@ -97,7 +97,7 @@ void Server::cloudCallback(sensor_msgs::PointCloud2::ConstPtr const &msg)
 	try {
 		transform =
 		    ufomap_ros::rosToUfo(tf_buffer_
-		                             .lookupTransform("pelican/pelican/velodyne", msg->header.frame_id,
+		                             .lookupTransform("world", "pelican/imu_link",
 		                                              msg->header.stamp, transform_timeout_)
 		                             .transform);
 	} catch (tf2::TransformException &ex) {
@@ -140,7 +140,7 @@ void Server::cloudCallback(sensor_msgs::PointCloud2::ConstPtr const &msg)
 				    try {
 					    transform = ufomap_ros::rosToUfo(
 					        tf_buffer_
-					            .lookupTransform("pelican/pelican/velodyne", robot_frame_id_, msg->header.stamp,
+					            .lookupTransform("world", robot_frame_id_, msg->header.stamp,
 					                             transform_timeout_)
 					            .transform);
 				    } catch (tf2::TransformException &ex) {
