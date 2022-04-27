@@ -24,7 +24,7 @@ using namespace std::this_thread;
 struct node{
    public:
       ufo::math::Vector3* point;
-      node* myParent;
+      node* myParent = nullptr;
       double distanceToParent;
       std::list<struct node*> myChilds{};
       std::list<struct node*> myPath{};
@@ -90,8 +90,8 @@ struct node{
           ufo::math::Vector3 upwards(point->x(), point->y(), point->z() + 1);
         
           //Angles
-          double vertical_angle = 0.16;
-          double horizontal_angle = 0.5;
+          double vertical_angle = 0.262;
+          double horizontal_angle = 0.785;
         
           //Distances
           double near_distance = 0.2;
@@ -139,34 +139,67 @@ struct node{
           if(myParent != nullptr){
             myParent->findInformationGain(SCALER_AABB, map);
           }
+        }else{
+          std::list<ufo::math::Vector3>::iterator it_hits;	
+          for(it_hits = myHits.begin(); it_hits != myHits.end();){
+            std::cout << "kommer hit? 2.4.1" << std::endl;
+            ufo::geometry::LineSegment myLine2(*point, *it_hits);
+            if(isInCollision(map, myLine2, true, false, false, 4)){
+              std::cout << "kommer hit? 2.4.2" << std::endl;
+              it_hits = myHits.erase(it_hits);
+            }else{
+              std::cout << "kommer hit? 2.4.3" << std::endl;
+              if(isInCollision(map, *it_hits, false, true, false, 4)){
+                it_hits = myHits.erase(it_hits);
+              }else{
+                it_hits++;
+              };
+            };
+            std::cout << "kommer hit? 2.4.slut" << std::endl;
+          };
         }
+        std::cout << "kommer hit? 2.4.slut.1" << std::endl;
         std::list<ufo::math::Vector3> myTotalHits{};
+        std::cout << "kommer hit? 2.4.slut.2" << std::endl;
         addHits(&myTotalHits);
+        std::cout << "kommer hit? 2.4.slut.3" << std::endl;
         int hits = myTotalHits.size();
+        std::cout << "kommer hit? 2.4.slut.4" << std::endl;
         return hits;
       }
       
       void addHits(std::list<ufo::math::Vector3>* hitList){
         bool add = true;
+        std::cout << "addhits.0" << std::endl;
         for(auto it = myHits.begin(), it_end = myHits.end(); it != it_end; ++it){
+          //std::cout << "addhits.1" << std::endl;
           for(auto it2 = hitList->begin(), it_end2 = hitList->end(); it2 != it_end2; ++it2){
+            //std::cout << "addhits.2" << std::endl;
             if(it->x() == it2->x() and it->y() == it2->y() and it->z() == it2->z()){
+              std::cout << "addhits.3" << std::endl;
               add = false;
               break;
             }
           }
+          std::cout << "addhits.4" << std::endl;
           if(add){
+            std::cout << "addhits.5" << std::endl;
             hitList->push_back(*it);
+            std::cout << "addhits.6" << std::endl;
           }
           add = true;
         }
+        std::cout << "addhits.6.5" << std::endl;
         if(myParent != nullptr){
+          std::cout << "addhits.7" << std::endl;
           myParent->addHits(hitList);
+          std::cout << "addhits.8" << std::endl;
         }
       };
       
       bool findPathImprovement(struct node* targetNode, ufo::map::OccupancyMapColor const& map){
         bool improvementFound;
+        std::cout << "kommer in i findPathImprovement" << std::endl;
         if(myParent != nullptr){
           improvementFound = myParent->findPathImprovement(targetNode, map);
         }else{
@@ -176,7 +209,7 @@ struct node{
             return true;
           }else{
             return false;
-          }
+          };
         }
         if(!improvementFound){
           ufo::geometry::LineSegment myLine(*(targetNode->point), *point);
@@ -215,7 +248,7 @@ int NUMBER_OF_ITTERATIONS = 3000;
 float DISTANCE_BETWEEN_NODES = 1;
 bool RUN_BY_NODES = true;
 double SENSOR_RANGE = 2;
-double SCALER_INFORMATION_GAIN = 1;
+double SCALER_INFORMATION_GAIN = 25;
 int itterations;
 int STEP_LENGTH = 1;
 float SCALER_AABB = 20;
@@ -233,13 +266,14 @@ float position_x = 0;
 float position_y = 0;
 float position_z = 0;
 double arbitraryDistance = 0.5;
-struct node* goalNode;
+node* goalNode;
 float lowest_x;
 float lowest_y;
 float lowest_z;
 float highest_x;
 float highest_y;
 float highest_z;
+double totalCost = std::numeric_limits<float>::max();
 
 
 // Create a colored UFOMap
@@ -337,22 +371,32 @@ bool isInCollision(ufo::map::OccupancyMapColor const& map,
 
 void findShortestPath(){
   for(std::list<node>::iterator it_goals = myGoals.begin(); it_goals != myGoals.end(); it_goals++){
-    struct node* chosenNode;
+    std::cout << "är det här? 0" << std::endl;
+    struct node* chosenNode = nullptr;
     double distance = std::numeric_limits<double>::max();
     for(std::list<node>::iterator it_RRT = RRT_TREE.begin(); it_RRT != RRT_TREE.end(); it_RRT++){
+      std::cout << "är det här? 1" << std::endl;
       double distanceNodeToGoal = sqrt(pow(it_RRT->point->x() - it_goals->point->x(), 2) + pow(it_RRT->point->y() - it_goals->point->y(), 2) + pow(it_RRT->point->z() - it_goals->point->z(), 2));
       double distanceToNode = it_RRT->sumDistance();
       double totalDistance = distanceNodeToGoal + distanceToNode;
+      std::cout << "är det här? 2" << std::endl;
       if(totalDistance < distance){
+        std::cout << "är det här? 3" << std::endl;
         ufo::geometry::LineSegment myLine(*(it_goals->point), *(it_RRT->point));
         if(!isInCollision(myMap, myLine, true, false, true, 4)){
+          std::cout << "är det här? 4" << std::endl;
           distance = totalDistance;
           chosenNode = &*it_RRT;
         }
       }
     }
-    it_goals->addParent(chosenNode);
-    chosenNode->addChild(&*it_goals);
+    std::cout << "är det här? 5" << std::endl;
+    if(chosenNode != nullptr){
+      it_goals->addParent(chosenNode);
+      std::cout << "är det här? 6" << std::endl;
+      chosenNode->addChild(&*it_goals);
+      std::cout << "är det här? 7" << std::endl;
+    }
   }
 }
 
@@ -399,21 +443,28 @@ void generateGoals(ufo::map::OccupancyMapColor const& map){
 };
 
 void setPath(){
-  double totalCost = std::numeric_limits<float>::max();
   double newCost = std::numeric_limits<float>::max();
+  double totalCost = std::numeric_limits<float>::max();
   for(std::list<node>::iterator it_goal = myGoals.begin(); it_goal != myGoals.end(); it_goal++){
-    it_goal->findPathImprovement(&*it_goal, myMap);
-    linSpace(&*it_goal, DISTANCE_BETWEEN_NODES);
-    it_goal->findPathImprovement(&*it_goal, myMap);
-    //std::cout << "Krashar efter cost calc?" << std::endl;
-    newCost = it_goal->sumDistance() - SCALER_INFORMATION_GAIN * (it_goal->findInformationGain(SCALER_AABB, myMap));
-    linSpace(&*it_goal, DISTANCE_BETWEEN_NODES);
-    //std::cout << "naej" << std::endl;
-    //std::cout << "My hits = " << it_goal->findInformationGain(SCALER_AABB, myMap) << std::endl;
-    if(newCost < totalCost){
-      totalCost = newCost;
-      goalNode = &*it_goal;
-      newPath = true;
+    std::cout << "kommer hit? 2.1" << std::endl;
+    if(it_goal->myParent != nullptr){	
+      it_goal->findPathImprovement(&*it_goal, myMap);
+      std::cout << "kommer hit? 2.2" << std::endl;
+      linSpace(&*it_goal, DISTANCE_BETWEEN_NODES);
+      std::cout << "kommer hit? 2.3" << std::endl;
+      it_goal->findPathImprovement(&*it_goal, myMap);
+      std::cout << "kommer hit? 2.4" << std::endl;
+      //std::cout << "Krashar efter cost calc?" << std::endl;
+      newCost = it_goal->sumDistance() - SCALER_INFORMATION_GAIN * (it_goal->findInformationGain(SCALER_AABB, myMap));
+      std::cout << "kommer hit? 2.5" << std::endl;
+      linSpace(&*it_goal, DISTANCE_BETWEEN_NODES);
+      //std::cout << "naej" << std::endl;
+      //std::cout << "My hits = " << it_goal->findInformationGain(SCALER_AABB, myMap) << std::endl;
+      if((newCost < totalCost) and (it_goal->findInformationGain(SCALER_AABB, myMap) > 0)){
+        totalCost = newCost;
+        goalNode = &*it_goal;
+        newPath = true;
+      }
     }
   }
 }
@@ -434,8 +485,9 @@ void generateRRT(){
     float y = lowest_y + abs(1024 * rand () / (RAND_MAX + 1.0)) * SCALER_Y;
     float z = lowest_z + abs(1024 * rand () / (RAND_MAX + 1.0)) * SCALER_Z;
     ufo::math::Vector3 random_point(x, y, z);
+    ufo::geometry::Sphere point_sphere(random_point, radius);
     // If the point is not occupied, continue
-    if(!isInCollision(myMap, random_point, true, false, true, 0) and isInCollision(myMap, random_point, false, true, false, 0)){
+    if(!isInCollision(myMap, point_sphere, true, false, true, 0) and isInCollision(myMap, point_sphere, false, true, false, 0)){
       // TO DO: check for unknown within sensor_range
       //Find closest node in the RRT-TREE, set up the relation and add to tree
       float distance = std::numeric_limits<float>::max();
@@ -506,8 +558,8 @@ void mapCallback(ufomap_msgs::UFOMapStamped::ConstPtr const& msg)
 
 void odomCallback(const nav_msgs::Odometry::ConstPtr& msg){
   position_received = true;
-  position_x = msg->pose.pose.position.x + 3;
-  position_y = msg->pose.pose.position.y + 3;
+  position_x = msg->pose.pose.position.x;
+  position_y = msg->pose.pose.position.y;
   position_z = msg->pose.pose.position.z;
 }
 
@@ -535,10 +587,20 @@ int main(int argc, char *argv[])
   //auto duration = duration_cast<microseconds>(stop - start);
   //cout << "\nExecution time: " << duration.count() << " micro seconds for " << NUMBER_OF_NODES << " itterations." << endl;
   while(ros::ok()){
+    std::cout << "start" << std::endl;
     if(map_received and not GOALS_generated and position_received){
       itterations = 0;
       tuneGeneration(myMap, false, true, false, 4);
-      myGoals.clear();
+      std::list<node>::iterator it_goal2;
+      for(it_goal2 = myGoals.begin(); it_goal2 != myGoals.end(); it_goal2++){
+        if(&*it_goal2 == goalNode){
+          it_goal2++;
+          myGoals.erase(it_goal2, myGoals.end());
+          it_goal2=myGoals.end();
+          it_goal2--;
+          myGoals.erase(myGoals.begin(), it_goal2);
+        }
+      }
       generateGoals(myMap);
     }
     if(map_received and not RRT_created and GOALS_generated){
@@ -553,18 +615,22 @@ int main(int argc, char *argv[])
         cout << "\nTimeout after " << duration.count() << " micro seconds for " << itterations << " itterations." << endl;
       }
       if(RRT_created){
+        std::cout << "går in mot findshortestpath" << std::endl;
         auto start2 = high_resolution_clock::now();
+        std::cout << "är problemet findshortestpath?" << std::endl;
         findShortestPath();
+        std::cout << "problemet är inte findshortestpath" << std::endl;
         auto stop2 = high_resolution_clock::now();
         auto duration2 = duration_cast<microseconds>(stop2 - start2);
         cout << "\nExecution time: " << duration2.count() << ", this is to find the shortest paths to our goals" << endl;
         itterations = 0;
       }
     }
-
+  
     if(map_received and RRT_created){
+      std::cout << "Går förbi map_received" << std::endl;
       visualization_msgs::Marker RRT_points, RRT_line_list, CHOSEN_PATH_points, CHOSEN_PATH_line_list, PATH_points, PATH_line_list, GOAL_points, HITS_points;
-      geometry_msgs::PoseStamped NEXT_POINT;
+      // geometry_msgs::PoseStamped NEXT_POINT;
       // nav_msgs::Path MY_CHOSEN_PATH;
     
       RRT_points.header.frame_id = RRT_line_list.header.frame_id = "world";
@@ -601,6 +667,7 @@ int main(int argc, char *argv[])
       points_pub.publish(RRT_line_list);
       
       if(!fetched_path and RRT_created){
+      std::cout << "kommer hit? 1" << std::endl;
       fetched_path = true;
       CHOSEN_PATH_points.header.frame_id = CHOSEN_PATH_line_list.header.frame_id = "world"; //MY_CHOSEN_PATH.header.frame_id = "pelican/velodyne";
       CHOSEN_PATH_points.ns = "points";
@@ -617,19 +684,28 @@ int main(int argc, char *argv[])
       CHOSEN_PATH_points.color.a = 1.0;
       CHOSEN_PATH_line_list.color.b = 1.0;
       CHOSEN_PATH_line_list.color.a = 1.0;
+      std::cout << "kommer hit? 2" << std::endl;
       auto start = high_resolution_clock::now();
       setPath();
+      std::cout << "kommer hit? 3" << std::endl;
       CHOSEN_PATH.clear();
+      std::cout << "kommer hit? 4" << std::endl;
       goalNode->getPath(&CHOSEN_PATH);
+      std::cout << "kommer hit? 5" << std::endl;
       auto stop = high_resolution_clock::now();
       auto duration = duration_cast<microseconds>(stop - start);
       cout << "\nExecution time: " << duration.count() << " micro seconds for " << myGoals.size() << " path/s." << endl;
       CHOSEN_PATH.push_back(goalNode);
+      std::cout << "kommer hit? 6" << std::endl;
       if(newPath){
+        std::cout << "kommer hit? 6.1" << std::endl;
         newPath = false;
         path_itterator = CHOSEN_PATH.begin();
+        std::cout << "kommer hit? 6.2" << std::endl;
         currentTarget = *path_itterator;
+        std::cout << "kommer hit? 6.3" << std::endl;
       };
+      std::cout << "kommer hit? 7" << std::endl;
       std::list<node*>::iterator it_comeon_visualizer2;	
       for(it_comeon_visualizer2 = CHOSEN_PATH.begin(); it_comeon_visualizer2 != CHOSEN_PATH.end(); it_comeon_visualizer2++){
         geometry_msgs::Point p;
@@ -699,12 +775,14 @@ int main(int argc, char *argv[])
       }
       all_path_pub.publish(PATH_points);
       all_path_pub.publish(PATH_line_list);
+      std::cout << "kommer hit? slut" << std::endl;
       }
       if(fetched_path){
       if(sqrt(pow(position_x - currentTarget->point->x(), 2) + pow(position_y - currentTarget->point->y(), 2) + pow(position_z - currentTarget->point->z(), 2)) < 0.5){
         path_itterator++;
         currentTarget = *path_itterator;
       }
+      std::cout << "kommer hit? slut.1" << std::endl;
       geometry_msgs::PoseStamped nextPoint;
       nextPoint.pose.position.x = (currentTarget)->point->x();
       nextPoint.pose.position.y = (currentTarget)->point->y();
@@ -717,7 +795,7 @@ int main(int argc, char *argv[])
       nextPoint.header.frame_id = "world";
       chosen_path_pub.publish(nextPoint);
       }
-      
+      std::cout << "kommer hit? slut.2" << std::endl;
       GOAL_points.header.frame_id = "world";
       GOAL_points.ns = "points";
       GOAL_points.action = visualization_msgs::Marker::ADD;
@@ -737,9 +815,12 @@ int main(int argc, char *argv[])
         GOAL_points.points.push_back(p);
       }
       goal_pub.publish(GOAL_points);
+      std::cout << "kommer hit? slut.3" << std::endl;
       
       hits.clear();
+      std::cout << "kommer hit? slut.4" << std::endl;
       goalNode->addHits(&hits);
+      std::cout << "kommer hit? slut.5" << std::endl;
       HITS_points.header.frame_id = "world";
       HITS_points.ns = "points";
       HITS_points.action = visualization_msgs::Marker::ADD;
@@ -759,7 +840,7 @@ int main(int argc, char *argv[])
         HITS_points.points.push_back(p);
       }
       hits_pub.publish(HITS_points);
-
+    std::cout << "kommer hit? slut.6" << std::endl;
     itterations++;
     if(itterations > 10){
       itterations = 0;
@@ -768,11 +849,13 @@ int main(int argc, char *argv[])
       GOALS_generated = false;
       position_received = false;
     }
+    std::cout << "kommer hit? slut.7" << std::endl;
     }
     ufomap_msgs::UFOMapStamped::Ptr msg(new ufomap_msgs::UFOMapStamped);
     bool compress = false;
     ufo::map::DepthType pub_depth = 0;
     // Convert UFOMap to ROS message
+    std::cout << "kommer hit? slut.8" << std::endl;
     if (ufomap_msgs::ufoToMsg(myMap, msg->map, compress, pub_depth)) {
       //std::cout << "Map conversion success!" << std::endl;
       // Conversion was successful
@@ -782,7 +865,9 @@ int main(int argc, char *argv[])
     }else{
       std::cout << "Map conversion failed!" << std::endl;
     }
+    std::cout << "kommer hit? slut.slut" << std::endl;
     ros::spinOnce();
+    std::cout << "kommer hit? slut.slut.slut" << std::endl;
     rate.sleep();
   }
   return 0;
