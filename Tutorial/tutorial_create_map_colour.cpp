@@ -16,6 +16,8 @@
 #include "nav_msgs/Odometry.h"
 #include <math.h>
 #include "MAV/rrt/rrt_bindings.h"
+#include <dlfcn.h>
+#include <stdlib.h>
 
 using namespace std::chrono;
 using namespace std;
@@ -563,6 +565,9 @@ void odomCallback(const nav_msgs::Odometry::ConstPtr& msg){
   position_z = msg->pose.pose.position.z;
 }
 
+typedef rrtCache* (*arbitrary)();
+typedef rrtSolverStatus (*arbitrary2)(void*, double*, double*, double, double*);
+
 int main(int argc, char *argv[])
 { 
   ros::init(argc, argv, "RRT_TREE");
@@ -579,6 +584,95 @@ int main(int argc, char *argv[])
   ros::Publisher hits_pub = nh.advertise<visualization_msgs::Marker>("HITS", 1);
   ros::Rate rate(10);
   std::list<node*>::iterator path_itterator;
+  
+  // C++ bindings battlefield
+  /* parameters             */
+  int i;
+  double p[RRT_NUM_PARAMETERS] = {0};
+  p[0] = 0;
+  p[1] = 0;
+  p[2] = 0;
+  p[3] = 0;
+  p[4] = 0;
+  p[5] = 0;
+  p[6] = 0;
+  p[7] = 0;
+  
+  for (i = 1; i < 51; ++i) {
+    p[8*i] = 0.5*i;
+    p[8*i+1] = 0.5*i;
+    p[8*i+2] = 0;
+    p[8*i+3] = 0;
+    p[8*i+4] = 0;
+    p[8*i+5] = 0;
+    p[8*i+6] = 0;
+    p[8*i+7] = 0;
+        /*printf("%d\n", 8*i+7); */
+  }
+  
+  p[408] = 9.81;
+  p[409] = 0;
+  p[410] = 0;
+  p[411] = 9.81;
+  p[412] = 0;
+  p[413] = 0;
+  p[414] = 0.5;
+  
+  /* initial guess          */
+  double u[RRT_NUM_DECISION_VARIABLES] = {0};
+
+  for (i = 0; i < 50; ++i) {
+    u[3*i] = 9.81;
+    u[3*i + 1] = 0;
+    u[3*i + 2] = 0;
+  }
+
+  /* initial penalty        */
+  double init_penalty = 15.0;
+  void *handle = dlopen("./MAV/rrt/target/release/librrt.so", RTLD_LAZY);
+  if (!handle) {
+    fprintf(stderr, "%s\n", dlerror());
+    exit(EXIT_FAILURE);
+  }
+  arbitrary rrt_new;
+  *(void **) (&rrt_new) = dlsym(handle, "rrt_new");
+  std::cout << rrt_new << std::endl;
+  void* cache = rrt_new();
+  std::cout << cache << std::endl;
+  arbitrary2 rrt_solve;
+  *(void **) (&rrt_solve) = dlsym(handle, "rrt_solve");
+  std::cout << rrt_solve << std::endl;
+  std::cout << init_penalty << std::endl;
+  rrtSolverStatus status = rrt_solve(cache, u, p, 0, &init_penalty);
+  printf("\n\n-------------------------------------------------\n");
+  printf("  Solution\n");
+  printf("-------------------------------------------------\n");
+
+  for (i = 0; i < RRT_NUM_DECISION_VARIABLES; ++i) {
+    printf("u[%d] = %g\n", i, u[i]);
+  }
+
+  printf("\n");
+  for (i = 0; i < RRT_N1; ++i) {
+    printf("y[%d] = %g\n", i, status.lagrange[i]);
+  }
+
+  printf("\n\n-------------------------------------------------\n");
+  printf("  Solver Statistics\n");
+  printf("-------------------------------------------------\n");
+  printf("exit status      : %d\n", status.exit_status);
+  printf("iterations       : %lu\n", status.num_inner_iterations);
+  printf("outer iterations : %lu\n", status.num_outer_iterations);
+  printf("solve time       : %f ms\n", (double)status.solve_time_ns / 1000000.0);
+  printf("penalty          : %f\n", status.penalty);
+  printf("||Dy||/c         : %f\n", status.delta_y_norm_over_c);
+  printf("||F2(u)||        : %f\n", status.f2_norm);
+  printf("Cost             : %f\n", status.cost);
+  printf("||FRP||          : %f\n\n", status.last_problem_norm_fpr);
+  // double (*cosine)(double);
+  // cosine = (double (*)(double)) dlsym(handle, "cos");
+  // printf("%f\n", (*cosine)(2.0));
+  // printf("%f\n", cos(2.0));
   /*auto start = high_resolution_clock::now();
   createRRT();
   auto stop = high_resolution_clock::now();
