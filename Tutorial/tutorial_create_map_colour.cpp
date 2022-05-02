@@ -546,6 +546,101 @@ void generateRRT(){
   }
 };
 
+auto trajectory(std::list<float> x, std::list<float> u, float N, float dt, std::list<float> nmpc_ref, std::list<float> u_ref, std::list<float> u_old){
+    // Based on the initial condition and optimized trajectory u, computed the path as (x,y,z).
+    // Calculate the dynamic costs based on selected weights  
+    float ns = 8;
+    std::list<float> p_hist{};
+    std::list<float> x_hist{};
+    float cost = 0;
+    // Weight matrices
+    std::list<float> Qx = {0,0,0, 0, 0,0, 5, 5};
+    // P = 2*Qx; #final state weight
+    std::list<float> Ru = {7,7,7}; // input weights
+    std::list<float> Rd = {3, 3, 3}; // input rate weights
+    // print(x, u, N, dt)
+    for(int i = 0; i < N; i++){
+      // State costs
+      // std::list<float> x_ref = nmpc_ref[(ns*i):(ns*i+ns)];
+      // #print(x_ref)
+      // Setting up itterators
+      std::list<float>::iterator Qx_itterator = Qx.begin();
+      std::advance(Qx_itterator, i);
+      std::list<float>::iterator x_itterator = x.begin();
+      std::advance(x_itterator, i);
+      std::list<float>::iterator x_ref_itterator = nmpc_ref.begin();
+      std::advance(x_ref_itterator, i*ns);
+      
+      for(int j = 0; j < 8; j++){
+        cost = cost + pow((*Qx_itterator) * (*x_itterator - *x_ref_itterator), 2);
+        Qx_itterator++;
+        x_itterator++;
+        x_ref_itterator++;
+      }
+      //cost = cost + pow((*Qx_itterator) * (*x_itterator - *x_ref_itterator), 2) + Qx[1]*(x[1]-x_ref[i + 1])**2 + Qx[2]*(x[2]-x_ref[i + 2])**2 + Qx[3]*(x[3]-x_ref[i + 3])**2 + Qx[4]*(x[4]-x_ref[i + 4])**2 + Qx[5]*(x[5]-x_ref[i + 5])**2 + Qx[6]*(x[6]-x_ref[i + 6])**2 + Qx[7]*(x[7]-x_ref[i + 7])**2;  // State weights
+      // Input Cost
+      
+      //Setting up itterators
+      std::list<float>::iterator Ru_itterator = Ru.begin();
+      std::list<float>::iterator Rd_itterator = Rd.begin();
+      std::list<float>::iterator u_n_itterator = u.begin();
+      std::advance(u_n_itterator, 3 * i);
+      std::list<float>::iterator u_ref_itterator = u_ref.begin();
+      std::list<float>::iterator u_old_itterator = u.begin();
+      
+      for(int j = 0; j < 3; j++){
+        cost = cost + *Ru_itterator * pow((*u_n_itterator) - (*u_ref_itterator), 2);
+        cost = cost + *Rd_itterator * pow((*u_n_itterator) - (*u_old_itterator), 2);
+        Qx_itterator++;
+        x_itterator++;
+        x_ref_itterator++;
+      }
+      
+      //u_n = u[(3*i):3*i+3];
+      //cost += Ru[0]*(u_n[0] - u_ref[0])**2 + Ru[1]*(u_n[1] - u_ref[1])**2 + Ru[2]*(u_n[2] - u_ref[2])**2; // Input weights
+      //cost += Rd[0]*(u_n[0] - u_old[0])**2 + Rd[1]*(u_n[1] - u_old[1])**2 + Rd[2]*(u_n[2] - u_old[2])**2; // Input rate weights
+      //u_old = u_n;
+      // x_hist = x_hist + [x];
+      for(x_itterator = x.begin(); x_itterator != x.end(); x_itterator++){
+        x_hist.push_back(*x_itterator);
+      }
+      
+      x_itterator = x.begin();
+      std::list<float>::iterator x2_itterator = x.begin();
+      std::advance(x2_itterator, 3);
+      std::advance(u_n_itterator, -2);
+      for(int j = 0; j < 3; j++){
+        *x_itterator = *x_itterator + dt * *x2_itterator;
+        x_itterator++;
+        x2_itterator++;
+      }
+      std::list<float>::iterator x3_itterator = x.begin();
+      std::advance(x3_itterator, 7); // x[7]
+      *x_itterator = *x_itterator + dt * sin(*x3_itterator) * cos(*x2_itterator) * *u_n_itterator - 0.1 * *x_itterator;
+      x_itterator++; // x[4]
+      *x_itterator = *x_itterator + dt * (-sin(*x3_itterator)) * *u_n_itterator - 0.1 * *x_itterator;
+      x_itterator++; // x[5]
+      *x_itterator = *x_itterator + dt * cos(*x3_itterator) * cos(*x2_itterator) * *u_n_itterator - 0.2 * *x_itterator - 9.81;
+      x_itterator++;
+      u_n_itterator++;
+      *x_itterator = *x_itterator + dt * ((1.0 / 0.3) * (*u_n_itterator - *x_itterator));
+      x_itterator++;
+      u_n_itterator++;
+      *x_itterator = *x_itterator + dt * ((1.0 / 0.3) * (*u_n_itterator - *x_itterator));
+      /*
+      p_hist = p_hist + [[x[0],x[1],x[2]]];*/
+      x_itterator = x.begin();
+      p_hist.push_back(*x_itterator);
+      x_itterator++;
+      p_hist.push_back(*x_itterator);
+      x_itterator++;      
+      p_hist.push_back(*x_itterator);    
+    }
+    // print(cost)
+    // print(p_hist)
+    return(p_hist, cost, x_hist);
+}
+
 void mapCallback(ufomap_msgs::UFOMapStamped::ConstPtr const& msg)
 {
   // Convert ROS message to UFOMap
@@ -669,6 +764,7 @@ int main(int argc, char *argv[])
   printf("||F2(u)||        : %f\n", status.f2_norm);
   printf("Cost             : %f\n", status.cost);
   printf("||FRP||          : %f\n\n", status.last_problem_norm_fpr);
+
   // double (*cosine)(double);
   // cosine = (double (*)(double)) dlsym(handle, "cos");
   // printf("%f\n", (*cosine)(2.0));
