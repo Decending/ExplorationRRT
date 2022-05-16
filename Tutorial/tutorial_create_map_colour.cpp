@@ -206,14 +206,40 @@ struct node{
         }
       };
       
-      bool findPathImprovement(struct node* targetNode, ufo::map::OccupancyMapColor const& map){
+      bool findPathImprovement(struct node* targetNode, ufo::map::OccupancyMapColor const& map, float givenDistance, float givenRadious){
         bool improvementFound;
         // std::cout << "kommer in i findPathImprovement" << std::endl;
         if(myParent != nullptr){
-          improvementFound = myParent->findPathImprovement(targetNode, map);
+          improvementFound = myParent->findPathImprovement(targetNode, map, givenDistance, givenRadious);
         }else{
           ufo::geometry::LineSegment myLine(*(targetNode->point), *point);
           if(!isInCollision(map, myLine, true, false, true, 4)){
+            /*ufo::math::Vector3 newVector(targetNode->point->x() - point->x(), targetNode->point->y() - point->y(), targetNode->point->z() - point->z());
+            //std::cout << "my newVector: " << newVector.x() << ", " << newVector.y() << ", " << newVector.z() << std::endl;
+            float distance = newVector.norm();
+            float itterations = (distance / givenDistance);
+            //std::cout << "my distance: " << distance << std::endl;
+            //std::cout << "my givenDistance: " << givenDistance << std::endl;
+            //std::cout << "my itterations: " << itterations << std::endl;
+            float part = givenDistance / distance;
+            float xStep = (targetNode->point->x() - point->x()) * part;
+            float yStep = (targetNode->point->y() - point->y()) * part;
+            float zStep = (targetNode->point->z() - point->z()) * part;
+            // node* parent = givenNode->myParent;
+            // node* nextNode = givenNode->myParent;
+            for(int i = 1; i < itterations; i++){
+              //std::cout << "\nnewPoints x, y, z: " << parent->point->x() << ", " << parent->point->y() << ", " << parent->point->z() << std::endl;
+              ufo::math::Vector3 newVector = ufo::math::Vector3(point->x() + i * xStep, point->y() + i * yStep, point->z() + i * zStep);
+              ufo::geometry::Sphere new_sphere(newVector, givenRadious);
+              if(isInCollision(map, new_sphere, true, false, true, 4)){
+                return false;
+              }
+              //std::cout << "newPoints x, y, z: " << newPoint->point->x() << ", " << newPoint->point->y() << ", " << newPoint->point->z() << std::endl;
+              // newPoint->addParent(parent);
+              //std::cout << "newPoints x, y, z: " << newPoint->myParent->point->x() << ", " << newPoint->myParent->point->y() << ", " << newPoint->myParent->point->z() << std::endl;
+              // parent = newPoint;
+              // RRT_TREE.push_back(*newPoint);
+            }*/
             targetNode->addParent(this);
             return true;
           }else{
@@ -224,7 +250,7 @@ struct node{
           ufo::geometry::LineSegment myLine(*(targetNode->point), *point);
           if(!isInCollision(map, myLine, true, false, true, 4)){
             targetNode->addParent(this);
-            improvementFound = findPathImprovement(this, map);
+            improvementFound = findPathImprovement(this, map, givenDistance, givenRadious);
             return improvementFound;
           }else{
             return false;
@@ -264,7 +290,7 @@ float SCALER_AABB = 20;
 float SCALER_X = SCALER_AABB;
 float SCALER_Y = SCALER_AABB;
 float SCALER_Z = SCALER_AABB;
-double radius = 0.5;
+double radius = 0.6;
 bool map_received = false;
 bool RRT_created = false;
 bool GOALS_generated = false;
@@ -285,6 +311,7 @@ float highest_y;
 float highest_z;
 double totalCost = std::numeric_limits<float>::max();
 double totalDistance = -1;
+int advance_index = 0;
 
 
 // Create a colored UFOMap
@@ -466,11 +493,11 @@ void setPath(){
   for(std::list<node>::iterator it_goal = myGoals.begin(); it_goal != myGoals.end(); it_goal++){
     // std::cout << "kommer hit? 2.1" << std::endl;
     if(it_goal->myParent != nullptr){	
-      it_goal->findPathImprovement(&*it_goal, myMap);
+      it_goal->findPathImprovement(&*it_goal, myMap, DISTANCE_BETWEEN_NODES, radius);
       // std::cout << "kommer hit? 2.2" << std::endl;
       linSpace(&*it_goal, DISTANCE_BETWEEN_NODES);
       // std::cout << "kommer hit? 2.3" << std::endl;
-      it_goal->findPathImprovement(&*it_goal, myMap);
+      it_goal->findPathImprovement(&*it_goal, myMap, DISTANCE_BETWEEN_NODES, radius);
       // std::cout << "kommer hit? 2.4" << std::endl;
       //std::cout << "Krashar efter cost calc?" << std::endl;
       newCost = it_goal->sumDistance() - SCALER_INFORMATION_GAIN * (it_goal->findInformationGain(SCALER_AABB, myMap));
@@ -862,7 +889,8 @@ int main(int argc, char *argv[])
       RRT_points.color.a = 1.0;
       RRT_line_list.color.b = 1.0;
       RRT_line_list.color.a = 1.0;
-      std::list<node>::iterator it_comeon_visualizer;	
+      std::list<node>::iterator it_comeon_visualizer;
+      std::cout << "Försöker visualisera rrt_tree" << std::endl;	
       for(it_comeon_visualizer = RRT_TREE.begin(); it_comeon_visualizer != RRT_TREE.end(); it_comeon_visualizer++){
         geometry_msgs::Point p;
         p.x = it_comeon_visualizer->point->x();
@@ -877,6 +905,7 @@ int main(int argc, char *argv[])
           RRT_line_list.points.push_back(p);
         }
       }
+      std::cout << "lyckades visualisera rrt_tree" << std::endl;
       points_pub.publish(RRT_points);
       points_pub.publish(RRT_line_list);
       
@@ -905,6 +934,8 @@ int main(int argc, char *argv[])
       CHOSEN_PATH.clear();
       std::cout << "kommer hit? 4" << std::endl;
       goalNode->getPath(&CHOSEN_PATH);
+      path_itterator = CHOSEN_PATH.begin();
+      std::advance(path_itterator, advance_index);
       std::cout << "kommer hit? 5" << std::endl;
       auto stop = high_resolution_clock::now();
       auto duration = duration_cast<microseconds>(stop - start);
@@ -918,6 +949,9 @@ int main(int argc, char *argv[])
         path_itterator = CHOSEN_PATH.begin();
         std::cout << "kommer hit? 6.2" << std::endl;
         currentTarget = *path_itterator;
+        advance_index = 0;
+        std::cout << "kommer hit? 6.2.0" << std::endl;
+        std::cout << currentTarget << std::endl;
         std::cout << "kommer hit? 6.3" << std::endl;
       };
       std::cout << "kommer hit? 7" << std::endl;
@@ -994,22 +1028,37 @@ int main(int argc, char *argv[])
       std::cout << "kommer hit? slut" << std::endl;
       }
       if(fetched_path){
+      std::cout << "Kommer hit? slut.0" << std::endl;
       if((sqrt(pow(position_x - currentTarget->point->x(), 2) + pow(position_y - currentTarget->point->y(), 2) + pow(position_z - currentTarget->point->z(), 2)) < 0.5) and path_itterator != CHOSEN_PATH.end()){
+        std::cout << "Kommer hit? slut.0.1" << std::endl;
         path_itterator++;
+        advance_index++;
+        std::cout << "Kommer hit? slut.0.2" << std::endl;
         currentTarget = *path_itterator;
+        std::cout << "kommer hit? slut.0.2.0" << std::endl;
+        std::cout << currentTarget << std::endl;
+        std::cout << "Kommer hit? slut.0.3" << std::endl;
       }
-      std::cout << "kommer hit? slut.1" << std::endl;
-      geometry_msgs::PoseStamped nextPoint;
-      nextPoint.pose.position.x = (currentTarget)->point->x();
-      nextPoint.pose.position.y = (currentTarget)->point->y();
-      nextPoint.pose.position.z = (currentTarget)->point->z();
-      nextPoint.pose.orientation.x = 0;
-      nextPoint.pose.orientation.y = 0;
-      nextPoint.pose.orientation.z = 0;
-      nextPoint.pose.orientation.w = 0;
-      nextPoint.header.stamp = ros::Time::now();
-      nextPoint.header.frame_id = "world";
-      chosen_path_pub.publish(nextPoint);
+      std::cout << "Kommer hit? slut.0.slut" << std::endl;
+      if(currentTarget != nullptr){
+        std::cout << "kommer hit? slut.1" << std::endl;
+        geometry_msgs::PoseStamped nextPoint;
+        std::cout << "kommer hit? slut.1.1" << std::endl;
+        nextPoint.pose.position.x = (currentTarget)->point->x();
+        std::cout << "kommer hit? slut.1.2" << std::endl;
+        nextPoint.pose.position.y = (currentTarget)->point->y();
+        std::cout << "kommer hit? slut.3" << std::endl;
+        nextPoint.pose.position.z = (currentTarget)->point->z();
+        std::cout << "kommer hit? slut.4" << std::endl;
+        nextPoint.pose.orientation.x = 0;
+        nextPoint.pose.orientation.y = 0;
+        nextPoint.pose.orientation.z = 0;
+        nextPoint.pose.orientation.w = 0;
+        nextPoint.header.stamp = ros::Time::now();
+        nextPoint.header.frame_id = "world";
+        chosen_path_pub.publish(nextPoint);
+      }
+      std::cout << "kommer hit? slut.1.3" << std::endl;
       }
       std::cout << "kommer hit? slut.2" << std::endl;
       GOAL_points.header.frame_id = "world";
@@ -1084,6 +1133,9 @@ int main(int argc, char *argv[])
     std::cout << "kommer hit? slut.slut" << std::endl;
     ros::spinOnce();
     std::cout << "kommer hit? slut.slut.slut" << std::endl;
+    if(currentTarget != nullptr){
+    std::cout << "target: " << currentTarget->point->x() << ", " << currentTarget->point->y() << ", " << currentTarget->point->z() << std::endl;
+    }
     rate.sleep();
   }
   return 0;
