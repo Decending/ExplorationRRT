@@ -321,6 +321,7 @@ std::list<struct node*> CHOSEN_PATH{};
 std::list<struct node*> ALL_PATH{};
 std::list<struct node> myGoals{};
 std::list<ufo::math::Vector3> hits{};
+std::list<geometry_msgs::Point> VISITED_POINTS{};
 node* currentTarget;
 
 void linSpace(node* givenNode, float givenDistance){
@@ -342,7 +343,7 @@ void linSpace(node* givenNode, float givenDistance){
   node* nextNode = givenNode->myParent;
   for(int i = 1; i < itterations; i++){
     //std::cout << "\nnewPoints x, y, z: " << parent->point->x() << ", " << parent->point->y() << ", " << parent->point->z() << std::endl;
-    node* newPoint = new node(givenNode->point->x() + i * xStep, givenNode->point->y() + i * yStep, givenNode->point->z() + i * zStep);
+    node* newPoint = new node(givenNode->myParent->point->x() - i * xStep, givenNode->myParent->point->y() - i * yStep, givenNode->myParent->point->z() - i * zStep);
     //std::cout << "newPoints x, y, z: " << newPoint->point->x() << ", " << newPoint->point->y() << ", " << newPoint->point->z() << std::endl;
     newPoint->addParent(parent);
     //std::cout << "newPoints x, y, z: " << newPoint->myParent->point->x() << ", " << newPoint->myParent->point->y() << ", " << newPoint->myParent->point->z() << std::endl;
@@ -728,6 +729,7 @@ int main(int argc, char *argv[])
   ros::Subscriber map_sub = nh.subscribe("ufomap_mapping_server_node/map_depth_4", 1, mapCallback);
   ros::Subscriber sub = nh.subscribe("/pelican/ground_truth/odometry", 1, odomCallback);
   ros::Publisher hits_pub = nh.advertise<visualization_msgs::Marker>("HITS", 1);
+  ros::Publisher taken_path_pub = nh.advertise<visualization_msgs::Marker>("PATH_TAKEN", 1);
   ros::Rate rate(10);
   std::list<node*>::iterator path_itterator;
   
@@ -934,13 +936,13 @@ int main(int argc, char *argv[])
       CHOSEN_PATH.clear();
       std::cout << "kommer hit? 4" << std::endl;
       goalNode->getPath(&CHOSEN_PATH);
+      CHOSEN_PATH.push_back(goalNode);
       path_itterator = CHOSEN_PATH.begin();
       std::advance(path_itterator, advance_index);
       std::cout << "kommer hit? 5" << std::endl;
       auto stop = high_resolution_clock::now();
       auto duration = duration_cast<microseconds>(stop - start);
       cout << "\nExecution time: " << duration.count() << " micro seconds for " << myGoals.size() << " path/s." << endl;
-      CHOSEN_PATH.push_back(goalNode);
       std::cout << "kommer hit? 6" << std::endl;
       if(newPath and allowNewPath){
         std::cout << "kommer hit? 6.1" << std::endl;
@@ -1031,16 +1033,21 @@ int main(int argc, char *argv[])
       std::cout << "Kommer hit? slut.0" << std::endl;
       if((sqrt(pow(position_x - currentTarget->point->x(), 2) + pow(position_y - currentTarget->point->y(), 2) + pow(position_z - currentTarget->point->z(), 2)) < 0.5) and path_itterator != CHOSEN_PATH.end()){
         std::cout << "Kommer hit? slut.0.1" << std::endl;
-        path_itterator++;
+        //path_itterator++;
         advance_index++;
+        path_itterator = CHOSEN_PATH.begin();
+        std::advance(path_itterator, advance_index);
         std::cout << "Kommer hit? slut.0.2" << std::endl;
-        currentTarget = *path_itterator;
+        if(path_itterator == CHOSEN_PATH.end()){
+          path_itterator--;
+          currentTarget = *path_itterator;
+        }
         std::cout << "kommer hit? slut.0.2.0" << std::endl;
         std::cout << currentTarget << std::endl;
         std::cout << "Kommer hit? slut.0.3" << std::endl;
       }
       std::cout << "Kommer hit? slut.0.slut" << std::endl;
-      if(currentTarget != nullptr){
+      if(path_itterator != CHOSEN_PATH.end()){
         std::cout << "kommer hit? slut.1" << std::endl;
         geometry_msgs::PoseStamped nextPoint;
         std::cout << "kommer hit? slut.1.1" << std::endl;
@@ -1105,6 +1112,48 @@ int main(int argc, char *argv[])
         HITS_points.points.push_back(p);
       }
       hits_pub.publish(HITS_points);
+      /*
+      visualization_msgs::Marker TAKEN_PATH_points, TAKEN_PATH_line_list;
+      TAKEN_PATH_points.header.frame_id = TAKEN_PATH_line_list.header.frame_id = "world"; //MY_CHOSEN_PATH.header.frame_id = "pelican/velodyne";
+      TAKEN_PATH_points.ns = "points";
+      TAKEN_PATH_points.action = visualization_msgs::Marker::ADD;
+      TAKEN_PATH_points.pose.orientation.w = 1.0;
+      TAKEN_PATH_points.id = 0;
+      TAKEN_PATH_line_list.id = 1;
+      TAKEN_PATH_points.type = visualization_msgs::Marker::POINTS;
+      TAKEN_PATH_line_list.type = visualization_msgs::Marker::LINE_LIST;
+      TAKEN_PATH_points.scale.x = 0.2;
+      TAKEN_PATH_points.scale.y = 0.2;
+      TAKEN_PATH_line_list.scale.x = 0.1;
+      TAKEN_PATH_points.color.g = 1.0f;
+      TAKEN_PATH_points.color.a = 1.0;
+      TAKEN_PATH_line_list.color.b = 1.0;
+      TAKEN_PATH_line_list.color.a = 1.0;
+      if(VISITED_POINTS.empty() and position_received){
+        geometry_msgs::Point p;
+        p.x = position_x;
+        p.y = position_y;
+        p.z = position_z;
+        VISITED_POINTS.push_back(p);
+      }else{
+        std::list<geometry_msgs::Point>::iterator taken_path_visualizer;
+        taken_path_visualizer = VISITED_POINTS.end();
+        taken_path_visualizer--;
+        if(sqrt(pow((*taken_path_visualizer).x - position_x, 2) + pow((*taken_path_visualizer).y - position_y, 2) + pow((*taken_path_visualizer).z - position_z, 2)) >= 1.0){
+          geometry_msgs::Point p;
+          p.x = position_x;
+          p.y = position_y;
+          p.z = position_z;
+          VISITED_POINTS.push_back(p);
+        }
+      }
+      std::list<geometry_msgs::Point>::iterator taken_path_visualizer;	
+      for(taken_path_visualizer = VISITED_POINTS.begin(); taken_path_visualizer != VISITED_POINTS.end(); taken_path_visualizer++){
+        TAKEN_PATH_points.points.push_back(*taken_path_visualizer);
+      }
+      taken_path_pub.publish(TAKEN_PATH_points);
+      taken_path_pub.publish(TAKEN_PATH_line_list);*/
+      
     std::cout << "kommer hit? slut.6" << std::endl;
     itterations++;
     if(itterations > 10){
@@ -1132,9 +1181,14 @@ int main(int argc, char *argv[])
     }
     std::cout << "kommer hit? slut.slut" << std::endl;
     ros::spinOnce();
-    std::cout << "kommer hit? slut.slut.slut" << std::endl;
-    if(currentTarget != nullptr){
-    std::cout << "target: " << currentTarget->point->x() << ", " << currentTarget->point->y() << ", " << currentTarget->point->z() << std::endl;
+    std::cout << "kommer hit? slut.slut.slut\n" << std::endl;
+    if(goalNode != nullptr){
+      for(std::list<node*>::iterator path_itterator_helper = CHOSEN_PATH.begin(); path_itterator_helper != CHOSEN_PATH.end();){
+        std::cout << "target: " << (*path_itterator_helper)->point->x() << ", " << (*path_itterator_helper)->point->y() << ", " << (*path_itterator_helper)->point->z() << std::endl;
+        path_itterator_helper++;
+      }
+      std::cout << "This is total distance: " << totalDistance << std::endl;
+      std::cout << "This is sum distance: " << goalNode->sumDistance() << std::endl;
     }
     rate.sleep();
   }
