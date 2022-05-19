@@ -74,7 +74,9 @@ struct node{
       void getPath(std::list<struct node*>* givenPath){
         if(myParent != nullptr){
           myParent->getPath(givenPath);
-          givenPath->push_back(myParent);
+          if(myParent->myParent != nullptr){
+            givenPath->push_back(myParent);
+          }
         }
         if(myParent == nullptr){
           return;
@@ -322,6 +324,7 @@ std::list<struct node*> ALL_PATH{};
 std::list<struct node> myGoals{};
 std::list<ufo::math::Vector3> hits{};
 std::list<geometry_msgs::Point> VISITED_POINTS{};
+std::list<node*>::iterator path_itterator;
 node* currentTarget;
 
 void linSpace(node* givenNode, float givenDistance){
@@ -491,31 +494,68 @@ void setPath(){
     }
   }
   double newCost = std::numeric_limits<float>::max();
-  for(std::list<node>::iterator it_goal = myGoals.begin(); it_goal != myGoals.end(); it_goal++){
-    // std::cout << "kommer hit? 2.1" << std::endl;
-    if(it_goal->myParent != nullptr){	
-      it_goal->findPathImprovement(&*it_goal, myMap, DISTANCE_BETWEEN_NODES, radius);
-      // std::cout << "kommer hit? 2.2" << std::endl;
-      linSpace(&*it_goal, DISTANCE_BETWEEN_NODES);
-      // std::cout << "kommer hit? 2.3" << std::endl;
-      it_goal->findPathImprovement(&*it_goal, myMap, DISTANCE_BETWEEN_NODES, radius);
-      // std::cout << "kommer hit? 2.4" << std::endl;
-      //std::cout << "Krashar efter cost calc?" << std::endl;
-      newCost = it_goal->sumDistance() - SCALER_INFORMATION_GAIN * (it_goal->findInformationGain(SCALER_AABB, myMap));
-      // std::cout << "kommer hit? 2.5" << std::endl;
-      linSpace(&*it_goal, DISTANCE_BETWEEN_NODES);
-      //std::cout << "naej" << std::endl;
-      //std::cout << "My hits = " << it_goal->findInformationGain(SCALER_AABB, myMap) << std::endl;
-      if(&(*it_goal) == goalNode){
-        std::cout << it_goal->sumDistance() << " is my sum distance and the following is my total distance  " << 0.2 * totalDistance << std::endl;
-      };
-      if((newCost < totalCost) and (it_goal->findInformationGain(SCALER_AABB, myMap) > 0) and allowNewPath){
-        std::cout << newCost << " < " << totalCost << ", " << it_goal->sumDistance() << " < " << 0.2 * totalDistance << std::endl;
-        totalCost = newCost;
-        goalNode = &*it_goal;
-        newPath = true;
-        setDistance = true;
+  if(allowNewPath){
+    for(std::list<node>::iterator it_goal = myGoals.begin(); it_goal != myGoals.end(); it_goal++){
+      // std::cout << "kommer hit? 2.1" << std::endl;
+      if(it_goal->myParent != nullptr){	
+        it_goal->findPathImprovement(&*it_goal, myMap, DISTANCE_BETWEEN_NODES, radius);
+        // std::cout << "kommer hit? 2.2" << std::endl;
+        linSpace(&*it_goal, DISTANCE_BETWEEN_NODES);
+        // std::cout << "kommer hit? 2.3" << std::endl;
+        it_goal->findPathImprovement(&*it_goal, myMap, DISTANCE_BETWEEN_NODES, radius);
+        // std::cout << "kommer hit? 2.4" << std::endl;
+        //std::cout << "Krashar efter cost calc?" << std::endl;
+        newCost = it_goal->sumDistance() - SCALER_INFORMATION_GAIN * (it_goal->findInformationGain(SCALER_AABB, myMap));
+        // std::cout << "kommer hit? 2.5" << std::endl;
+        linSpace(&*it_goal, DISTANCE_BETWEEN_NODES);
+        //std::cout << "naej" << std::endl;
+        //std::cout << "My hits = " << it_goal->findInformationGain(SCALER_AABB, myMap) << std::endl;
+        if(&(*it_goal) == goalNode){
+          std::cout << it_goal->sumDistance() << " is my sum distance and the following is my total distance  " << 0.2 * totalDistance << std::endl;
+        };
+        if((newCost < totalCost) and (it_goal->findInformationGain(SCALER_AABB, myMap) > 0) and allowNewPath){
+          std::cout << newCost << " < " << totalCost << ", " << it_goal->sumDistance() << " < " << 0.2 * totalDistance << std::endl;
+          totalCost = newCost;
+          goalNode = &*it_goal;
+          newPath = true;
+          setDistance = true;
+          CHOSEN_PATH.clear();
+          linSpace(goalNode, DISTANCE_BETWEEN_NODES);
+          goalNode->getPath(&CHOSEN_PATH);
+          CHOSEN_PATH.push_back(goalNode);
+          path_itterator = CHOSEN_PATH.begin();
+          currentTarget = *path_itterator;
+          std::cout << currentTarget->point->x() << std::endl;
+          std::cout << currentTarget->point->y() << std::endl;
+          std::cout << currentTarget->point->z() << std::endl;
+        }
       }
+    }
+  }else{
+    goalNode->findPathImprovement(goalNode, myMap, DISTANCE_BETWEEN_NODES, radius);
+    // std::cout << "kommer hit? 2.2" << std::endl;
+    linSpace(goalNode, DISTANCE_BETWEEN_NODES);
+    // std::cout << "kommer hit? 2.3" << std::endl;
+    goalNode->findPathImprovement(goalNode, myMap, DISTANCE_BETWEEN_NODES, radius);
+    // std::cout << "kommer hit? 2.4" << std::endl;
+    //std::cout << "Krashar efter cost calc?" << std::endl;
+    newCost = goalNode->sumDistance() - SCALER_INFORMATION_GAIN * (goalNode->findInformationGain(SCALER_AABB, myMap));
+    // std::cout << "kommer hit? 2.5" << std::endl;
+    linSpace(goalNode, DISTANCE_BETWEEN_NODES);
+    //std::cout << "naej" << std::endl;
+    //std::cout << "My hits = " << it_goal->findInformationGain(SCALER_AABB, myMap) << std::endl;
+    if((newCost < totalCost) and (goalNode->findInformationGain(SCALER_AABB, myMap) > 0)){
+      std::cout << newCost << " < " << totalCost << ", " << goalNode->sumDistance() << " < " << 0.2 * totalDistance << std::endl;
+      totalCost = newCost;
+      setDistance = true;
+      CHOSEN_PATH.clear();
+      goalNode->getPath(&CHOSEN_PATH);
+      CHOSEN_PATH.push_back(goalNode);
+      path_itterator = CHOSEN_PATH.begin();
+      currentTarget = *path_itterator;
+      std::cout << currentTarget->point->x() << std::endl;
+      std::cout << currentTarget->point->y() << std::endl;
+      std::cout << currentTarget->point->z() << std::endl;
     }
   }
   if(setDistance){
@@ -729,9 +769,9 @@ int main(int argc, char *argv[])
   ros::Subscriber map_sub = nh.subscribe("ufomap_mapping_server_node/map_depth_4", 1, mapCallback);
   ros::Subscriber sub = nh.subscribe("/pelican/ground_truth/odometry", 1, odomCallback);
   ros::Publisher hits_pub = nh.advertise<visualization_msgs::Marker>("HITS", 1);
+  ros::Publisher position_pub = nh.advertise<visualization_msgs::Marker>("POSITION", 1);
   ros::Publisher taken_path_pub = nh.advertise<visualization_msgs::Marker>("PATH_TAKEN", 1);
   ros::Rate rate(10);
-  std::list<node*>::iterator path_itterator;
   
   // C++ bindings battlefield
   /* parameters             */
@@ -848,9 +888,9 @@ int main(int argc, char *argv[])
     }
     if(map_received and not RRT_created and GOALS_generated){
       itterations = 0;
-      auto start = high_resolution_clock::now();
+      high_resolution_clock::time_point start = high_resolution_clock::now();
       generateRRT();
-      auto stop = high_resolution_clock::now();
+      high_resolution_clock::time_point stop = high_resolution_clock::now();
       auto duration = duration_cast<microseconds>(stop - start);
       if(itterations != 100000){
         cout << "\nExecution time: " << duration.count() << " micro seconds for " << itterations << " itterations." << endl;
@@ -859,11 +899,11 @@ int main(int argc, char *argv[])
       }
       if(RRT_created){
         std::cout << "går in mot findshortestpath" << std::endl;
-        auto start2 = high_resolution_clock::now();
+        high_resolution_clock::time_point start2 = high_resolution_clock::now();
         std::cout << "är problemet findshortestpath?" << std::endl;
         findShortestPath();
         std::cout << "problemet är inte findshortestpath" << std::endl;
-        auto stop2 = high_resolution_clock::now();
+        high_resolution_clock::time_point stop2 = high_resolution_clock::now();
         auto duration2 = duration_cast<microseconds>(stop2 - start2);
         cout << "\nExecution time: " << duration2.count() << ", this is to find the shortest paths to our goals" << endl;
         itterations = 0;
@@ -930,17 +970,19 @@ int main(int argc, char *argv[])
       CHOSEN_PATH_line_list.color.b = 1.0;
       CHOSEN_PATH_line_list.color.a = 1.0;
       std::cout << "kommer hit? 2" << std::endl;
-      auto start = high_resolution_clock::now();
+      high_resolution_clock::time_point start = high_resolution_clock::now();
       setPath();
       std::cout << "kommer hit? 3" << std::endl;
+      /*
       CHOSEN_PATH.clear();
       std::cout << "kommer hit? 4" << std::endl;
       goalNode->getPath(&CHOSEN_PATH);
       CHOSEN_PATH.push_back(goalNode);
       path_itterator = CHOSEN_PATH.begin();
       std::advance(path_itterator, advance_index);
+      */
       std::cout << "kommer hit? 5" << std::endl;
-      auto stop = high_resolution_clock::now();
+      high_resolution_clock::time_point stop = high_resolution_clock::now();
       auto duration = duration_cast<microseconds>(stop - start);
       cout << "\nExecution time: " << duration.count() << " micro seconds for " << myGoals.size() << " path/s." << endl;
       std::cout << "kommer hit? 6" << std::endl;
@@ -957,7 +999,8 @@ int main(int argc, char *argv[])
         std::cout << "kommer hit? 6.3" << std::endl;
       };
       std::cout << "kommer hit? 7" << std::endl;
-      std::list<node*>::iterator it_comeon_visualizer2;	
+      std::list<node*>::iterator it_comeon_visualizer2;
+      if(!CHOSEN_PATH.empty()){	
       for(it_comeon_visualizer2 = CHOSEN_PATH.begin(); it_comeon_visualizer2 != CHOSEN_PATH.end(); it_comeon_visualizer2++){
         geometry_msgs::Point p;
         p.x = (*it_comeon_visualizer2)->point->x();
@@ -974,15 +1017,18 @@ int main(int argc, char *argv[])
         CHOSEN_PATH_POINT.pose.orientation.z = 0;
         CHOSEN_PATH_POINT.pose.orientation.w = 0; */
         if((*it_comeon_visualizer2)->myParent != nullptr){
-          CHOSEN_PATH_line_list.points.push_back(p);
-          p.x = (*it_comeon_visualizer2)->myParent->point->x();
-          p.y = (*it_comeon_visualizer2)->myParent->point->y();
-          p.z = (*it_comeon_visualizer2)->myParent->point->z();
-          CHOSEN_PATH_line_list.points.push_back(p);
+          if(*it_comeon_visualizer2 != *CHOSEN_PATH.begin()){
+            CHOSEN_PATH_line_list.points.push_back(p);
+            p.x = (*it_comeon_visualizer2)->myParent->point->x();
+            p.y = (*it_comeon_visualizer2)->myParent->point->y();
+            p.z = (*it_comeon_visualizer2)->myParent->point->z();
+            CHOSEN_PATH_line_list.points.push_back(p);
+          }
         }
       }
+      }
       chosen_path_visualization_pub.publish(CHOSEN_PATH_points);
-      chosen_path_visualization_pub.publish(CHOSEN_PATH_line_list);
+      //chosen_path_visualization_pub.publish(CHOSEN_PATH_line_list);
       
       // chosen_path_pub.publish(MY_CHOSEN_PATH);
       
@@ -1037,6 +1083,7 @@ int main(int argc, char *argv[])
         advance_index++;
         path_itterator = CHOSEN_PATH.begin();
         std::advance(path_itterator, advance_index);
+        currentTarget = *path_itterator;
         std::cout << "Kommer hit? slut.0.2" << std::endl;
         if(path_itterator == CHOSEN_PATH.end()){
           path_itterator--;
@@ -1190,6 +1237,31 @@ int main(int argc, char *argv[])
       std::cout << "This is total distance: " << totalDistance << std::endl;
       std::cout << "This is sum distance: " << goalNode->sumDistance() << std::endl;
     }
+    if(position_received){
+      visualization_msgs::Marker POSITION_point;
+      POSITION_point.header.frame_id = "world";
+      POSITION_point.ns = "points";
+      POSITION_point.action = visualization_msgs::Marker::ADD;
+      POSITION_point.pose.orientation.w = 1.0;
+      POSITION_point.id = 0;
+      POSITION_point.type = visualization_msgs::Marker::POINTS;
+      POSITION_point.scale.x = 0.2;
+      POSITION_point.scale.y = 0.2;
+      POSITION_point.color.g = 1.0f;
+      POSITION_point.color.a = 1.0;
+      geometry_msgs::Point p;
+      p.x = position_x;
+      p.y = position_y;
+      p.z = position_z;
+      POSITION_point.points.push_back(p);
+      position_pub.publish(POSITION_point);
+    }
+    std::cout << "This is my position: " << position_x << ", " << position_y << ", " << position_z << std::endl;
+    if(currentTarget != nullptr){
+      std::cout << "This is my target: " << currentTarget->point->x() << ", " << currentTarget->point->y() << ", " << currentTarget->point->z() << std::endl;
+      std::cout << sqrt(pow(position_x - currentTarget->point->x(), 2) + pow(position_y - currentTarget->point->y(), 2) + pow(position_z - currentTarget->point->z(), 2)) << " < " << 0.5 << std::endl;
+    }
+    std::cout << advance_index << std::endl;
     rate.sleep();
   }
   return 0;
