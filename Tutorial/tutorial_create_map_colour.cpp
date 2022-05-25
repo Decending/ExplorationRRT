@@ -75,7 +75,7 @@ struct node{
         if(myParent != nullptr){
           myParent->getPath(givenPath);
           if(myParent->myParent != nullptr){
-            givenPath->push_back(myParent);
+            givenPath->push_back(new node(myParent->point->x(), myParent->point->y(), myParent->point->z()));
           }
         }
         if(myParent == nullptr){
@@ -522,7 +522,7 @@ void setPath(){
           CHOSEN_PATH.clear();
           linSpace(goalNode, DISTANCE_BETWEEN_NODES);
           goalNode->getPath(&CHOSEN_PATH);
-          CHOSEN_PATH.push_back(goalNode);
+          CHOSEN_PATH.push_back(new node(goalNode->point->x(), goalNode->point->y(), goalNode->point->z()));
           path_itterator = CHOSEN_PATH.begin();
           currentTarget = *path_itterator;
           std::cout << currentTarget->point->x() << std::endl;
