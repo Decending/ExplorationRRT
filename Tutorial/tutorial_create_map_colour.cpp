@@ -1159,7 +1159,7 @@ int main(int argc, char *argv[])
         HITS_points.points.push_back(p);
       }
       hits_pub.publish(HITS_points);
-      /*
+      
       visualization_msgs::Marker TAKEN_PATH_points, TAKEN_PATH_line_list;
       TAKEN_PATH_points.header.frame_id = TAKEN_PATH_line_list.header.frame_id = "world"; //MY_CHOSEN_PATH.header.frame_id = "pelican/velodyne";
       TAKEN_PATH_points.ns = "points";
@@ -1199,7 +1199,7 @@ int main(int argc, char *argv[])
         TAKEN_PATH_points.points.push_back(*taken_path_visualizer);
       }
       taken_path_pub.publish(TAKEN_PATH_points);
-      taken_path_pub.publish(TAKEN_PATH_line_list);*/
+      taken_path_pub.publish(TAKEN_PATH_line_list);
       
     std::cout << "kommer hit? slut.6" << std::endl;
     itterations++;
