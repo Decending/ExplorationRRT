@@ -311,6 +311,9 @@ float lowest_z;
 float highest_x;
 float highest_y;
 float highest_z;
+float averageInfo = 0.0;
+float initialGoalInfo = 0.0;
+int averageInfoCounter = 0;
 double totalCost = std::numeric_limits<float>::max();
 double totalDistance = -1;
 int advance_index = 0;
@@ -363,15 +366,15 @@ void linSpace(node* givenNode, float givenDistance){
   }*/
 }
 
-void tuneGeneration(ufo::map::OccupancyMapColor const& map, bool occupied_space, bool free_space, bool unknown_space, ufo::map::DepthType min_depth = 4){
+void tuneGeneration(ufo::map::OccupancyMapColor const& map, bool occupied_space, bool free_space, bool unknown_space, float given_x, float given_y, float given_z, ufo::map::DepthType min_depth = 4){
   highest_x = std::numeric_limits<float>::min();
   highest_y = std::numeric_limits<float>::min();
   highest_z = std::numeric_limits<float>::min();
   lowest_x = std::numeric_limits<float>::max();
   lowest_y = std::numeric_limits<float>::max();
   lowest_z = std::numeric_limits<float>::max();
-  ufo::math::Vector3 minPoint(position_x - 1 * SCALER_AABB, position_y - 1 * SCALER_AABB, position_z - 1 * SCALER_AABB);
-  ufo::math::Vector3 maxPoint(position_x + 1 * SCALER_AABB, position_y + 1 * SCALER_AABB, position_z + 1 * SCALER_AABB);
+  ufo::math::Vector3 minPoint(given_x - 1 * SCALER_AABB, given_y - 1 * SCALER_AABB, given_z - 1 * SCALER_AABB);
+  ufo::math::Vector3 maxPoint(given_x + 1 * SCALER_AABB, given_y + 1 * SCALER_AABB, given_z + 1 * SCALER_AABB);
   ufo::geometry::AABB aabb(minPoint, maxPoint);
   for (auto it = map.beginLeaves(aabb, occupied_space, free_space, unknown_space, false, min_depth), it_end = map.endLeaves(); it != it_end; ++it) {
     if(it.getX() > highest_x){
@@ -528,10 +531,13 @@ void setPath(){
           std::cout << currentTarget->point->x() << std::endl;
           std::cout << currentTarget->point->y() << std::endl;
           std::cout << currentTarget->point->z() << std::endl;
+          initialGoalInfo = goalNode->myHits.size();
         }
       }
     }
-  }else{
+    averageInfoCounter++;
+    averageInfo = averageInfo + (goalNode->myHits.size() - averageInfo)/averageInfoCounter;
+  }/*else{
     goalNode->findPathImprovement(goalNode, myMap, DISTANCE_BETWEEN_NODES, radius);
     // std::cout << "kommer hit? 2.2" << std::endl;
     linSpace(goalNode, DISTANCE_BETWEEN_NODES);
@@ -557,7 +563,7 @@ void setPath(){
       std::cout << currentTarget->point->y() << std::endl;
       std::cout << currentTarget->point->z() << std::endl;
     }
-  }
+  }*/
   if(setDistance){
     totalDistance = goalNode->sumDistance();
   };
@@ -873,7 +879,7 @@ int main(int argc, char *argv[])
     std::cout << "start" << std::endl;
     if(map_received and not GOALS_generated and position_received){
       itterations = 0;
-      tuneGeneration(myMap, false, true, false, 4);
+      tuneGeneration(myMap, false, true, false, 3, position_x, position_y, position_z);
       std::list<node>::iterator it_goal2;
       for(it_goal2 = myGoals.begin(); it_goal2 != myGoals.end(); it_goal2++){
         if(&*it_goal2 == goalNode){
@@ -971,6 +977,7 @@ int main(int argc, char *argv[])
       CHOSEN_PATH_line_list.color.a = 1.0;
       std::cout << "kommer hit? 2" << std::endl;
       high_resolution_clock::time_point start = high_resolution_clock::now();
+      std::cout << "clock crash?" << std::endl;
       setPath();
       std::cout << "kommer hit? 3" << std::endl;
       /*
@@ -1262,6 +1269,56 @@ int main(int argc, char *argv[])
       std::cout << sqrt(pow(position_x - currentTarget->point->x(), 2) + pow(position_y - currentTarget->point->y(), 2) + pow(position_z - currentTarget->point->z(), 2)) << " < " << 0.5 << std::endl;
     }
     std::cout << advance_index << std::endl;
+    std::cout << fetched_path << std::endl;
+    /*if(goalNode != nullptr){
+      std::cout << "This is my found infoGain for the chosen path: " << goalNode->myHits.size() << std::endl;
+      std::cout << "This is my average infoGain: " << averageInfo << std::endl;
+      std::cout << "This is my infoGain counter: " << averageInfoCounter << std::endl;
+      if(initialGoalInfo < (0.15 * averageInfo) and averageInfoCounter > 5){
+        std::cout << "TRIGGER!" << std::endl;
+        std::list<geometry_msgs::Point>::iterator retrace_path_itterator = VISITED_POINTS.end();
+        retrace_path_itterator--;
+        geometry_msgs::Point* lastChecked = &*retrace_path_itterator;
+        for(retrace_path_itterator; retrace_path_itterator != VISITED_POINTS.begin(); retrace_path_itterator--){
+          if(sqrt(pow(lastChecked->x - retrace_path_itterator->x, 2) + pow(lastChecked->y - retrace_path_itterator->y, 2) + pow(lastChecked->z - retrace_path_itterator->z, 2)) >= SCALER_AABB){
+            lastChecked = &*retrace_path_itterator;
+            tuneGeneration(myMap, false, true, false, 4, retrace_path_itterator->x, retrace_path_itterator->y, retrace_path_itterator->z);
+            generateGoals(myMap);
+            int largestInformationGain = 0;
+            for(std::list<node>::iterator retrace_path_goal_itterator = myGoals.begin(); retrace_path_goal_itterator != myGoals.end(); retrace_path_goal_itterator++){
+              int newInformationGain = retrace_path_goal_itterator->findInformationGain(SCALER_AABB, myMap);
+              if(newInformationGain > largestInformationGain){
+                goalNode = &*retrace_path_goal_itterator;
+                largestInformationGain = newInformationGain;
+              }
+            }
+            if(goalNode->myHits.size() > averageInfo * 0.5){
+              //create path between where we're at and the point we found
+              ufo::math::Vector3 myPoint1(retrace_path_itterator->x, retrace_path_itterator->y, retrace_path_itterator->z);
+              ufo::geometry::LineSegment myLine(*(goalNode->point), myPoint1);
+              if(!isInCollision(myMap, myLine, true, false, true, 4)){
+                // add to path
+                CHOSEN_PATH.clear();
+                std::list<geometry_msgs::Point>::iterator retrace_path_itterator_helper = VISITED_POINTS.end();
+                std::advance(retrace_path_itterator_helper, -2);
+                retrace_path_itterator--;
+                for(retrace_path_itterator_helper; retrace_path_itterator_helper != retrace_path_itterator; retrace_path_itterator_helper--){
+                  node* myNode = new node(retrace_path_itterator_helper->x, retrace_path_itterator_helper->y, retrace_path_itterator_helper->z);
+                  CHOSEN_PATH.push_back(myNode);
+                }
+                CHOSEN_PATH.push_back(goalNode);
+              }else{
+                std::cout << "fan" << std::endl;
+              }
+            }
+          }
+        }
+        //break;
+      }
+    }*/
+    std::cout << SCALER_X << " = " << highest_x << " - " << lowest_x << std::endl;
+    std::cout << SCALER_Y << " = " << highest_y << " - " << lowest_y << std::endl;
+    std::cout << SCALER_Z << " = " << highest_z << " - " << lowest_z << std::endl;
     rate.sleep();
   }
   return 0;
