@@ -262,6 +262,10 @@ struct node{
         }
       }
       
+      void readyForDeletion(){
+        delete point;
+      }
+      
       bool isInCollision(ufo::map::OccupancyMapColor const& map, 
                    ufo::geometry::BoundingVar const& bounding_volume, 
                    bool occupied_space = true, bool free_space = false,
@@ -283,9 +287,11 @@ int NUMBER_OF_NODES = 3000;
 int NUMBER_OF_GOALS = 40;
 int NUMBER_OF_ITTERATIONS = 3000;
 float DISTANCE_BETWEEN_NODES = 1;
+float MINIMUM_DISTANCE_TO_GOAL = 0.5;
 bool RUN_BY_NODES = true;
 double SENSOR_RANGE = 2;
-double SCALER_INFORMATION_GAIN = 25;
+double SCALER_INFORMATION_GAIN = 0.5;
+double SCALER_DISTANCE = 5;
 int itterations;
 int STEP_LENGTH = 1;
 float SCALER_AABB = 20;
@@ -300,6 +306,7 @@ bool position_received = false;
 bool fetched_path = false;
 bool newPath = false;
 bool allowNewPath = true;
+bool recoveryUnderway = false;
 float position_x = 0;
 float position_y = 0;
 float position_z = 0;
@@ -321,7 +328,7 @@ int advance_index = 0;
 
 // Create a colored UFOMap
 ufo::map::OccupancyMapColor myMap(0.4);
-std::list<struct node> RRT_TREE{};
+std::list<struct node*> RRT_TREE{};
 std::list<struct node*> CHOSEN_PATH{};
 std::list<struct node*> ALL_PATH{};
 std::list<struct node> myGoals{};
@@ -354,7 +361,7 @@ void linSpace(node* givenNode, float givenDistance){
     newPoint->addParent(parent);
     //std::cout << "newPoints x, y, z: " << newPoint->myParent->point->x() << ", " << newPoint->myParent->point->y() << ", " << newPoint->myParent->point->z() << std::endl;
     parent = newPoint;
-    RRT_TREE.push_back(*newPoint);
+    RRT_TREE.push_back(newPoint);
   }
   givenNode->addParent(parent);
   if(nextNode->myParent != nullptr){
@@ -419,19 +426,19 @@ void findShortestPath(){
     // std::cout << "är det här? 0" << std::endl;
     struct node* chosenNode = nullptr;
     double distance = std::numeric_limits<double>::max();
-    for(std::list<node>::iterator it_RRT = RRT_TREE.begin(); it_RRT != RRT_TREE.end(); it_RRT++){
+    for(std::list<node*>::iterator it_RRT = RRT_TREE.begin(); it_RRT != RRT_TREE.end(); it_RRT++){
       // std::cout << "är det här? 1" << std::endl;
-      double distanceNodeToGoal = sqrt(pow(it_RRT->point->x() - it_goals->point->x(), 2) + pow(it_RRT->point->y() - it_goals->point->y(), 2) + pow(it_RRT->point->z() - it_goals->point->z(), 2));
-      double distanceToNode = it_RRT->sumDistance();
+      double distanceNodeToGoal = sqrt(pow((*it_RRT)->point->x() - it_goals->point->x(), 2) + pow((*it_RRT)->point->y() - it_goals->point->y(), 2) + pow((*it_RRT)->point->z() - it_goals->point->z(), 2));
+      double distanceToNode = (*it_RRT)->sumDistance();
       double totalDistance = distanceNodeToGoal + distanceToNode;
       // std::cout << "är det här? 2" << std::endl;
       if(totalDistance < distance){
         // std::cout << "är det här? 3" << std::endl;
-        ufo::geometry::LineSegment myLine(*(it_goals->point), *(it_RRT->point));
+        ufo::geometry::LineSegment myLine(*(it_goals->point), *((*it_RRT)->point));
         if(!isInCollision(myMap, myLine, true, false, true, 4)){
           // std::cout << "är det här? 4" << std::endl;
           distance = totalDistance;
-          chosenNode = &*it_RRT;
+          chosenNode = *it_RRT;
         }
       }
     }
@@ -455,25 +462,27 @@ void generateGoals(ufo::map::OccupancyMapColor const& map){
     float z = lowest_z + abs(1024 * rand () / (RAND_MAX + 1.0)) * SCALER_Z;
     ufo::math::Vector3 goal(x, y, z);
     ufo::geometry::Sphere goal_sphere(goal, radius);
-    if(!isInCollision(myMap, goal_sphere, true, false, true, 4) and isInCollision(myMap, goal_sphere, false, true, false, 4)){
-      ufo::math::Vector3 min_point(x - SENSOR_RANGE, y - SENSOR_RANGE, z - SENSOR_RANGE);
-      ufo::math::Vector3 max_point(x + SENSOR_RANGE, y + SENSOR_RANGE, z + SENSOR_RANGE);
-      ufo::math::Vector3 position(position_x, position_y, position_z);
-      ufo::geometry::AABB aabb(min_point, max_point);
-      for (auto it = map.beginLeaves(aabb, false, false, true, false, 4), it_end = map.endLeaves(); it != it_end; ++it) {
-        if (it.isUnknown()) {
-          ufo::math::Vector3 unknownNode(it.getX(), it.getY(), it.getZ());
-          ufo::geometry::LineSegment myLine(goal, unknownNode);
-          if(!isInCollision(map, myLine, true, false, false, 4)){
-            node* newGoal = new node(x, y, z);
-            myGoals.push_back(*newGoal);
-            break;
+    if(sqrt(pow(position_x - x, 2) + pow(position_y - y, 2) + pow(position_z - z, 2)) > MINIMUM_DISTANCE_TO_GOAL){
+      if(!isInCollision(myMap, goal_sphere, true, false, true, 4) and isInCollision(myMap, goal_sphere, false, true, false, 4)){
+        ufo::math::Vector3 min_point(x - SENSOR_RANGE, y - SENSOR_RANGE, z - SENSOR_RANGE);
+        ufo::math::Vector3 max_point(x + SENSOR_RANGE, y + SENSOR_RANGE, z + SENSOR_RANGE);
+        ufo::math::Vector3 position(position_x, position_y, position_z);
+        ufo::geometry::AABB aabb(min_point, max_point);
+        for (auto it = map.beginLeaves(aabb, false, false, true, false, 4), it_end = map.endLeaves(); it != it_end; ++it) {
+          if (it.isUnknown()) {
+            ufo::math::Vector3 unknownNode(it.getX(), it.getY(), it.getZ());
+            ufo::geometry::LineSegment myLine(goal, unknownNode);
+            if(!isInCollision(map, myLine, true, false, false, 4)){
+              node* newGoal = new node(x, y, z);
+              myGoals.push_back(*newGoal);
+              break;
+            }
           }
+        break;
         }
-      break;
-      }
-    };
+      };
       itterations++;
+    }
   };
   if(myGoals.size() == NUMBER_OF_GOALS){
     std::cout << "Goals generated successfully\n" << std::endl;
@@ -491,9 +500,11 @@ void setPath(){
   bool setDistance = false;
   if(goalNode != nullptr){
     goalNode->clearInformationGain();
-    totalCost = goalNode->sumDistance() - SCALER_INFORMATION_GAIN * (goalNode->findInformationGain(SCALER_AABB, myMap));
     if(max(totalDistance * 0.1, 0.5) > goalNode->sumDistance()){
       allowNewPath = true;
+      totalCost = std::numeric_limits<float>::max();;
+    }else{
+      totalCost = goalNode->sumDistance() * SCALER_DISTANCE - SCALER_INFORMATION_GAIN * (goalNode->findInformationGain(SCALER_AABB, myMap));
     }
   }
   double newCost = std::numeric_limits<float>::max();
@@ -508,7 +519,7 @@ void setPath(){
         it_goal->findPathImprovement(&*it_goal, myMap, DISTANCE_BETWEEN_NODES, radius);
         // std::cout << "kommer hit? 2.4" << std::endl;
         //std::cout << "Krashar efter cost calc?" << std::endl;
-        newCost = it_goal->sumDistance() - SCALER_INFORMATION_GAIN * (it_goal->findInformationGain(SCALER_AABB, myMap));
+        newCost = it_goal->sumDistance() * SCALER_DISTANCE - SCALER_INFORMATION_GAIN * (it_goal->findInformationGain(SCALER_AABB, myMap));
         // std::cout << "kommer hit? 2.5" << std::endl;
         linSpace(&*it_goal, DISTANCE_BETWEEN_NODES);
         //std::cout << "naej" << std::endl;
@@ -522,6 +533,21 @@ void setPath(){
           goalNode = &*it_goal;
           newPath = true;
           setDistance = true;
+          if(not recoveryUnderway){
+            std::list<node*>::iterator it_clear_helper;
+            //std::cout << "Start deleting" << std::endl;
+            for(it_clear_helper = CHOSEN_PATH.begin(); it_clear_helper != --CHOSEN_PATH.end(); it_clear_helper++){
+              //std::cout << "Deleting 1" << std::endl;
+              (*it_clear_helper)->readyForDeletion();
+              delete(*it_clear_helper);
+              //std::cout << "Deleting 2" << std::endl;
+            }
+            //std::cout << "Deleting done" << std::endl;
+          }else{
+            std::list<node*>::iterator it_clear_helper = --CHOSEN_PATH.end();
+            (*it_clear_helper)->readyForDeletion();
+            delete(*it_clear_helper);
+          }
           CHOSEN_PATH.clear();
           linSpace(goalNode, DISTANCE_BETWEEN_NODES);
           goalNode->getPath(&CHOSEN_PATH);
@@ -570,13 +596,21 @@ void setPath(){
 }
 
 void generateRRT(){
+  std::list<node*>::iterator it_clear_helper;
+  //std::cout << "Start deleting" << std::endl;
+  for(it_clear_helper = RRT_TREE.begin(); it_clear_helper != --RRT_TREE.end(); it_clear_helper++){
+    //std::cout << "Deleting 1" << std::endl;
+    (*it_clear_helper)->readyForDeletion();
+    delete(*it_clear_helper);
+    //std::cout << "Deleting 2" << std::endl;
+  }
   RRT_TREE.clear();
   std::cout << "Building RRT-tree" << std::endl;
   float step_length = 1;
   float sensor_range = 2;
-  node origin(position_x, position_y, position_z);
+  node* origin = new node(position_x, position_y, position_z);
   std::cout << "My guessed point: " << position_x << ", " << position_y << ", " << position_z << std::endl;
-  origin.addParent(nullptr);
+  origin->addParent(nullptr);
   RRT_TREE.push_back(origin);
   srand(time(0));
   while(((RRT_TREE.size() <= NUMBER_OF_NODES and RUN_BY_NODES) or (itterations <= NUMBER_OF_ITTERATIONS and !RUN_BY_NODES)) and itterations < 100000){
@@ -592,21 +626,21 @@ void generateRRT(){
       //Find closest node in the RRT-TREE, set up the relation and add to tree
       float distance = std::numeric_limits<float>::max();
       node* parent;
-      std::list<node>::iterator it_node;
+      std::list<node*>::iterator it_node;
       for(it_node = RRT_TREE.begin(); it_node != RRT_TREE.end(); it_node++){
-        ufo::math::Vector3 direction = random_point - *(it_node->point);
+        ufo::math::Vector3 direction = random_point - *((*it_node)->point);
         double new_distance = abs(direction.norm());
         if(new_distance < distance){
           distance = new_distance;
-          parent = &*it_node;
+          parent = *it_node;
         }
       };
       ufo::math::Vector3 start_point(parent->point->x(), parent->point->y(), parent->point->z());
       ufo::geometry::LineSegment myLine(random_point, start_point);
       if(!isInCollision(myMap, myLine, true, false, true, 0)) {
-        node new_node(x, y, z);
-        new_node.addParent(parent);
-        parent->addChild(&new_node);
+        node* new_node = new node(x, y, z);
+        new_node->addParent(parent);
+        parent->addChild(new_node);
         RRT_TREE.push_back(new_node);
       }
     };
@@ -619,10 +653,10 @@ void generateRRT(){
     std::cout << "Verifying tree" << std::endl;
     int total_childs = 0;
     int total_parents = 0;
-    std::list<node>::iterator it_comeon;
+    std::list<node*>::iterator it_comeon;
     for(it_comeon = RRT_TREE.begin(); it_comeon != RRT_TREE.end(); it_comeon++){
-      total_childs = total_childs + it_comeon->myChilds.size();
-      if(it_comeon->myParent != nullptr){
+      total_childs = total_childs + (*it_comeon)->myChilds.size();
+      if((*it_comeon)->myParent != nullptr){
         total_parents = total_parents + 1;
       }
     };
@@ -879,7 +913,7 @@ int main(int argc, char *argv[])
     std::cout << "start" << std::endl;
     if(map_received and not GOALS_generated and position_received){
       itterations = 0;
-      tuneGeneration(myMap, false, true, false, 3, position_x, position_y, position_z);
+      tuneGeneration(myMap, false, true, false, position_x, position_y, position_z, 4);
       std::list<node>::iterator it_goal2;
       for(it_goal2 = myGoals.begin(); it_goal2 != myGoals.end(); it_goal2++){
         if(&*it_goal2 == goalNode){
@@ -937,19 +971,19 @@ int main(int argc, char *argv[])
       RRT_points.color.a = 1.0;
       RRT_line_list.color.b = 1.0;
       RRT_line_list.color.a = 1.0;
-      std::list<node>::iterator it_comeon_visualizer;
+      std::list<node*>::iterator it_comeon_visualizer;
       std::cout << "Försöker visualisera rrt_tree" << std::endl;	
       for(it_comeon_visualizer = RRT_TREE.begin(); it_comeon_visualizer != RRT_TREE.end(); it_comeon_visualizer++){
         geometry_msgs::Point p;
-        p.x = it_comeon_visualizer->point->x();
-        p.y = it_comeon_visualizer->point->y();
-        p.z = it_comeon_visualizer->point->z();
+        p.x = (*it_comeon_visualizer)->point->x();
+        p.y = (*it_comeon_visualizer)->point->y();
+        p.z = (*it_comeon_visualizer)->point->z();
         RRT_points.points.push_back(p);
-        if(it_comeon_visualizer->myParent != nullptr){
+        if((*it_comeon_visualizer)->myParent != nullptr){
           RRT_line_list.points.push_back(p);
-          p.x = it_comeon_visualizer->myParent->point->x();
-          p.y = it_comeon_visualizer->myParent->point->y();
-          p.z = it_comeon_visualizer->myParent->point->z();
+          p.x = (*it_comeon_visualizer)->myParent->point->x();
+          p.y = (*it_comeon_visualizer)->myParent->point->y();
+          p.z = (*it_comeon_visualizer)->myParent->point->z();
           RRT_line_list.points.push_back(p);
         }
       }
@@ -1084,7 +1118,7 @@ int main(int argc, char *argv[])
       }
       if(fetched_path){
       std::cout << "Kommer hit? slut.0" << std::endl;
-      if((sqrt(pow(position_x - currentTarget->point->x(), 2) + pow(position_y - currentTarget->point->y(), 2) + pow(position_z - currentTarget->point->z(), 2)) < 0.5) and path_itterator != CHOSEN_PATH.end()){
+      if((sqrt(pow(position_x - currentTarget->point->x(), 2) + pow(position_y - currentTarget->point->y(), 2) + pow(position_z - currentTarget->point->z(), 2)) < 0.5) and path_itterator != --CHOSEN_PATH.end()){
         std::cout << "Kommer hit? slut.0.1" << std::endl;
         //path_itterator++;
         advance_index++;
@@ -1270,11 +1304,12 @@ int main(int argc, char *argv[])
     }
     std::cout << advance_index << std::endl;
     std::cout << fetched_path << std::endl;
-    /*if(goalNode != nullptr){
+    if(goalNode != nullptr){
       std::cout << "This is my found infoGain for the chosen path: " << goalNode->myHits.size() << std::endl;
       std::cout << "This is my average infoGain: " << averageInfo << std::endl;
       std::cout << "This is my infoGain counter: " << averageInfoCounter << std::endl;
-      if(initialGoalInfo < (0.15 * averageInfo) and averageInfoCounter > 5){
+      std::cout << "This is my goalNodes infogain: " << initialGoalInfo << std::endl;
+      if(initialGoalInfo < (0.05 * averageInfo) and averageInfoCounter > 5 and not recoveryUnderway){
         std::cout << "TRIGGER!" << std::endl;
         std::list<geometry_msgs::Point>::iterator retrace_path_itterator = VISITED_POINTS.end();
         retrace_path_itterator--;
@@ -1282,7 +1317,7 @@ int main(int argc, char *argv[])
         for(retrace_path_itterator; retrace_path_itterator != VISITED_POINTS.begin(); retrace_path_itterator--){
           if(sqrt(pow(lastChecked->x - retrace_path_itterator->x, 2) + pow(lastChecked->y - retrace_path_itterator->y, 2) + pow(lastChecked->z - retrace_path_itterator->z, 2)) >= SCALER_AABB){
             lastChecked = &*retrace_path_itterator;
-            tuneGeneration(myMap, false, true, false, 4, retrace_path_itterator->x, retrace_path_itterator->y, retrace_path_itterator->z);
+            tuneGeneration(myMap, false, true, false, retrace_path_itterator->x, retrace_path_itterator->y, retrace_path_itterator->z, 4);
             generateGoals(myMap);
             int largestInformationGain = 0;
             for(std::list<node>::iterator retrace_path_goal_itterator = myGoals.begin(); retrace_path_goal_itterator != myGoals.end(); retrace_path_goal_itterator++){
@@ -1298,6 +1333,15 @@ int main(int argc, char *argv[])
               ufo::geometry::LineSegment myLine(*(goalNode->point), myPoint1);
               if(!isInCollision(myMap, myLine, true, false, true, 4)){
                 // add to path
+                std::list<node*>::iterator it_clear_helper;
+                //std::cout << "Start deleting" << std::endl;
+                for(it_clear_helper = CHOSEN_PATH.begin(); it_clear_helper != --CHOSEN_PATH.end(); it_clear_helper++){
+                  //std::cout << "Deleting 1" << std::endl;
+                  (*it_clear_helper)->readyForDeletion();
+                  delete(*it_clear_helper);
+                  //std::cout << "Deleting 2" << std::endl;
+                }
+                //std::cout << "Deleting done" << std::endl;
                 CHOSEN_PATH.clear();
                 std::list<geometry_msgs::Point>::iterator retrace_path_itterator_helper = VISITED_POINTS.end();
                 std::advance(retrace_path_itterator_helper, -2);
@@ -1306,7 +1350,10 @@ int main(int argc, char *argv[])
                   node* myNode = new node(retrace_path_itterator_helper->x, retrace_path_itterator_helper->y, retrace_path_itterator_helper->z);
                   CHOSEN_PATH.push_back(myNode);
                 }
-                CHOSEN_PATH.push_back(goalNode);
+                CHOSEN_PATH.push_back(new node(goalNode->point->x(), goalNode->point->y(), goalNode->point->z()));
+                allowNewPath = false;
+                recoveryUnderway = true;
+                break;
               }else{
                 std::cout << "fan" << std::endl;
               }
@@ -1315,7 +1362,7 @@ int main(int argc, char *argv[])
         }
         //break;
       }
-    }*/
+    }
     std::cout << SCALER_X << " = " << highest_x << " - " << lowest_x << std::endl;
     std::cout << SCALER_Y << " = " << highest_y << " - " << lowest_y << std::endl;
     std::cout << SCALER_Z << " = " << highest_z << " - " << lowest_z << std::endl;
