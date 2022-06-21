@@ -97,6 +97,7 @@ void Server::cloudCallback(sensor_msgs::PointCloud2::ConstPtr const &msg)
 	try {
 		transform =
 		    ufomap_ros::rosToUfo(tf_buffer_
+		                             //.lookupTransform("odom_ouster", "os_sensor",
 		                             .lookupTransform("world", "pelican/imu_link",
 		                                              msg->header.stamp, transform_timeout_)
 		                             .transform);
@@ -447,6 +448,7 @@ void Server::configCallback(ufomap_mapping::ServerConfig &config, uint32_t level
 	verbose_ = config.verbose;
 
 	max_range_ = config.max_range;
+	min_range_ = config.min_range;
 	insert_depth_ = config.insert_depth;
 	simple_ray_casting_ = config.simple_ray_casting;
 	early_stopping_ = config.early_stopping;
@@ -494,6 +496,7 @@ void Server::configCallback(ufomap_mapping::ServerConfig &config, uint32_t level
 		cloud_in_queue_size_ = config.cloud_in_queue_size;
 		cloud_sub_ =
 		    nh_.subscribe("/pelican/velodyne_points", cloud_in_queue_size_, &Server::cloudCallback, this);
+		    //nh_.subscribe("/os_cloud_node/points", cloud_in_queue_size_, &Server::cloudCallback, this);
 	}
 
 	// Set up timer
