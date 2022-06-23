@@ -27,7 +27,7 @@ struct node{
    public:
       ufo::math::Vector3* point;
       node* myParent = nullptr;
-      double distanceToParent;
+      double distanceToParent = -1;
       std::list<struct node*> myChilds{};
       std::list<struct node*> myPath{};
       std::list<ufo::math::Vector3> myHits{};
@@ -51,7 +51,7 @@ struct node{
         distanceToGoal = newDistance;
       }
       void changeDistanceToParent(){
-        if(myParent != nullptr){
+        if(myParent != nullptr and distanceToParent != -1){
           distanceToParent = sqrt(pow(point->x() - myParent->point->x(), 2) + pow(point->y() - myParent->point->y(), 2) + pow(point->z() - myParent->point->z(), 2));
         }
         else{
@@ -99,7 +99,7 @@ struct node{
         
           //Distances
           double near_distance = 0.2;
-          double far_distance = 15;
+          double far_distance = 10;
         
           //Frustums
           ufo::geometry::Frustum frustXP(*point, targetXP, upwards, vertical_angle, horizontal_angle, near_distance, far_distance);
@@ -322,7 +322,7 @@ int NUMBER_OF_NODES = 3000;
 int NUMBER_OF_GOALS = 40;
 int NUMBER_OF_ITTERATIONS = 3000;
 float DISTANCE_BETWEEN_NODES = 0.4; // 1.0;
-float DISTANCE_BETWEEN_GOALS = 1.0;
+float DISTANCE_BETWEEN_GOALS = 0.4;
 float MINIMUM_DISTANCE_TO_GOAL = 0.5;
 bool RUN_BY_NODES = true;
 double SENSOR_RANGE = 2;
@@ -474,12 +474,12 @@ void findShortestPath(){
         if(!isInCollision(myMap, myLine, true, false, true, 3)){
           ufo::math::Vector3 newVector((*it_goals)->point->x() - (*it_RRT)->point->x(), (*it_goals)->point->y() - (*it_RRT)->point->y(), (*it_goals)->point->z() - (*it_RRT)->point->z());
           //std::cout << "my newVector: " << newVector.x() << ", " << newVector.y() << ", " << newVector.z() << std::endl;
-          float distance = newVector.norm();
-          float itterations = (distance / radius);
+          float distance_calc = newVector.norm();
+          float itterations = (distance_calc / radius);
           //std::cout << "my distance: " << distance << std::endl;
           //std::cout << "my givenDistance: " << givenDistance << std::endl;
           //std::cout << "my itterations: " << itterations << std::endl;
-          float part = radius / distance;
+          float part = radius / distance_calc;
           float xStep = ((*it_goals)->point->x() - (*it_RRT)->point->x()) * part;
           float yStep = ((*it_goals)->point->y() - (*it_RRT)->point->y()) * part;
           float zStep = ((*it_goals)->point->z() - (*it_RRT)->point->z()) * part;
@@ -522,6 +522,7 @@ void findShortestPath(){
 void generateGoals(ufo::map::OccupancyMapColor const& map){
   // Generate goals, check for occupancy status
   if(goalNode != nullptr){
+    std::cout << "Goalnode is not nullptr!" << std::endl;
     if(sqrt(pow(position_x - goalNode->point->x(), 2) + pow(position_y - goalNode->point->y(), 2) + pow(position_z - goalNode->point->z(), 2)) > 0.5){
       std::list<node*>::iterator it_goal2;
       // std::cout << "this is my goal size: " << myGoals.size() << std::endl;
@@ -533,8 +534,6 @@ void generateGoals(ufo::map::OccupancyMapColor const& map){
           // std::cout << (*it_goal2)->point->x() << std::endl;
           (*it_goal2)->readyForDeletion();
           delete(*it_goal2);
-        }else{
-          // std::cout << "goalNode" << std::endl;
         }
       }
       // std::cout << "Big boy" << std::endl;
@@ -542,12 +541,13 @@ void generateGoals(ufo::map::OccupancyMapColor const& map){
       myGoals.clear();
       myGoals.push_back(goalNode);
     }else{
-      // std::cout << "this is my goal size: " << myGoals.size() << std::endl;
+      std::cout << "Deleting goals!" << std::endl;
       std::list<node*>::iterator it_goal2;
       for(it_goal2 = myGoals.begin(); it_goal2 != myGoals.end(); it_goal2++){
         (*it_goal2)->readyForDeletion();
         delete(*it_goal2);
       }
+      std::cout << "this is my goal size: " << myGoals.size() << std::endl;
       goalNode = nullptr;
       myGoals.clear();
       allowNewPath = true;
@@ -609,7 +609,7 @@ void setPath(){
   bool setDistance = false;
   if(goalNode != nullptr){
     goalNode->clearInformationGain();
-    if(max(totalDistance * 0.1, 0.5) > goalNode->sumDistance()){
+    if(sqrt(pow(position_x - goalNode->point->x(), 2) + pow(position_y - goalNode->point->y(), 2) + pow(position_z - goalNode->point->z(), 2)) < 0.5){
       allowNewPath = true;
       totalCost = std::numeric_limits<float>::max();
     }else{
@@ -634,7 +634,9 @@ void setPath(){
         //std::cout << "kommer hit? 2.4 ------------------------------------------------------------" << std::endl;
         //std::cout << "Krashar efter cost calc?" << std::endl;
         double distanceCost = (*it_goal)->sumDistance() * SCALER_DISTANCE;
+        std::cout << "Test 2.1" << std::endl;
         double informationGain = SCALER_INFORMATION_GAIN * ((*it_goal)->findInformationGain(SCALER_AABB, myMap));
+        std::cout << "Test 2.2" << std::endl;
         newCost = distanceCost - informationGain;
         if(informationGain > initialGoalInfo){
           initialGoalInfo = informationGain;
@@ -994,8 +996,8 @@ int main(int argc, char *argv[])
   ros::Publisher goal_pub = nh.advertise<visualization_msgs::Marker>("RRT_GOALS", 1);
   ros::Publisher map_pub = nh.advertise<ufomap_msgs::UFOMapStamped>("goe_map", 11);
   ros::Subscriber map_sub = nh.subscribe("ufomap_mapping_server_node/map_depth_3", 1, mapCallback);
-  //ros::Subscriber sub = nh.subscribe("/pelican/ground_truth/odometry", 1, odomCallback);
-  ros::Subscriber sub = nh.subscribe("/odometry/imu", 1, odomCallback);
+  ros::Subscriber sub = nh.subscribe("/pelican/ground_truth/odometry", 1, odomCallback);
+  //ros::Subscriber sub = nh.subscribe("/odometry/imu", 1, odomCallback);
   ros::Publisher hits_pub = nh.advertise<visualization_msgs::Marker>("HITS", 1);
   ros::Publisher position_pub = nh.advertise<visualization_msgs::Marker>("POSITION", 1);
   ros::Publisher taken_path_pub = nh.advertise<visualization_msgs::Marker>("PATH_TAKEN", 1);
@@ -1005,6 +1007,7 @@ int main(int argc, char *argv[])
   /* parameters             */
   int i;
   double p[RRT_NUM_PARAMETERS] = {0};
+  // Current position
   p[0] = 0;
   p[1] = 0;
   p[2] = 0;
@@ -1014,8 +1017,9 @@ int main(int argc, char *argv[])
   p[6] = 0;
   p[7] = 0;
   
+  // Trajectory
   for (i = 1; i < 51; ++i) {
-    p[8*i] = 0.5*i;
+    p[8*i] = 0.5*i; 
     p[8*i+1] = 0.5*i;
     p[8*i+2] = 0;
     p[8*i+3] = 0;
@@ -1026,12 +1030,13 @@ int main(int argc, char *argv[])
         /*printf("%d\n", 8*i+7); */
   }
   
-  p[408] = 9.81;
+  /*p[408] = 9.81;
   p[409] = 0;
   p[410] = 0;
   p[411] = 9.81;
   p[412] = 0;
-  p[413] = 0;
+  p[413] = 0;*/
+  
   p[414] = 0.5;
   
   /* initial guess          */
@@ -1291,7 +1296,7 @@ u[149] = 9.45204e-13;
     // std::cout << "start 1" << std::endl;
     if(map_received and not GOALS_generated and position_received){
       // std::cout << "start 2" << std::endl;
-      tuneGeneration(myMap, false, true, false, position_x, position_y, position_z, 4);
+      tuneGeneration(myMap, false, true, false, position_x, position_y, position_z, 3);
       // std::cout << "start 3" << std::endl;
       generateGoals(myMap);
     }
@@ -1680,11 +1685,11 @@ u[149] = 9.45204e-13;
     }
     // std::cout << advance_index << std::endl;
     // std::cout << fetched_path << std::endl;
-    if(goalNode != nullptr){
+    if(goalNode != nullptr or (goalNode == nullptr and GOALS_generated)){
       // std::cout << "This is my found infoGain for the chosen path: " << goalNode->myHits.size() << std::endl;
-      // std::cout << "This is my average infoGain: " << averageInfo << std::endl;
-      // std::cout << "This is my infoGain counter: " << averageInfoCounter << std::endl;
-      // std::cout << "This is my goalNodes infogain: " << initialGoalInfo << std::endl;
+      std::cout << "This is my average infoGain: " << averageInfo << std::endl;
+      std::cout << "This is my infoGain counter: " << averageInfoCounter << std::endl;
+      std::cout << "This is my goalNodes infogain: " << initialGoalInfo << std::endl;
       if(initialGoalInfo < (0.2 * averageInfo) and averageInfoCounter > 5 and not recoveryUnderway){
         std::cout << "TRIGGER!" << std::endl;
         std::list<geometry_msgs::Point>::iterator retrace_path_itterator = --VISITED_POINTS.end();
@@ -1692,7 +1697,7 @@ u[149] = 9.45204e-13;
         for(retrace_path_itterator; retrace_path_itterator != VISITED_POINTS.begin(); retrace_path_itterator--){
           if(sqrt(pow(lastChecked->x - retrace_path_itterator->x, 2) + pow(lastChecked->y - retrace_path_itterator->y, 2) + pow(lastChecked->z - retrace_path_itterator->z, 2)) >= SCALER_AABB){
             lastChecked = &*retrace_path_itterator;
-            tuneGeneration(myMap, false, true, false, retrace_path_itterator->x, retrace_path_itterator->y, retrace_path_itterator->z, 4);
+            tuneGeneration(myMap, false, true, false, retrace_path_itterator->x, retrace_path_itterator->y, retrace_path_itterator->z, 3);
             generateGoals(myMap);
             int largestInformationGain = 0;
             for(std::list<node*>::iterator retrace_path_goal_itterator = myGoals.begin(); retrace_path_goal_itterator != myGoals.end(); retrace_path_goal_itterator++){
