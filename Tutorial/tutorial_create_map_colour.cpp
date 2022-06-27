@@ -18,6 +18,7 @@
 #include "MAV/rrt/rrt_bindings.h"
 #include <dlfcn.h>
 #include <stdlib.h>
+#include <tf/tf.h>
 
 using namespace std::chrono;
 using namespace std;
@@ -75,7 +76,9 @@ struct node{
         if(myParent != nullptr){
           myParent->getPath(givenPath);
           if(myParent->myParent != nullptr){
-            givenPath->push_back(new node(myParent->point->x(), myParent->point->y(), myParent->point->z()));
+            if(myParent->point->x() != point->x() or myParent->point->y() != point->y() or myParent->point->z() != point->z()){ 
+              givenPath->push_back(new node(myParent->point->x(), myParent->point->y(), myParent->point->z()));
+            }
           }
         }
         if(myParent == nullptr){
@@ -321,7 +324,7 @@ struct node{
 int NUMBER_OF_NODES = 3000;
 int NUMBER_OF_GOALS = 40;
 int NUMBER_OF_ITTERATIONS = 3000;
-float DISTANCE_BETWEEN_NODES = 0.4; // 1.0;
+float DISTANCE_BETWEEN_NODES = 0.5; // 1.0;
 float DISTANCE_BETWEEN_GOALS = 0.4;
 float MINIMUM_DISTANCE_TO_GOAL = 0.5;
 bool RUN_BY_NODES = true;
@@ -346,6 +349,12 @@ bool recoveryUnderway = false;
 float position_x = 0;
 float position_y = 0;
 float position_z = 0;
+float velocity_x = 0;
+float velocity_y = 0;
+float velocity_z = 0;
+double roll = 0;
+double pitch = 0;
+double yaw = 0;
 double arbitraryDistance = 0.5;
 node* goalNode = nullptr;
 float lowest_x;
@@ -620,6 +629,7 @@ void setPath(){
   }
   double newCost = std::numeric_limits<float>::max();
   if(allowNewPath){
+    std::list<double> PATH_CONTAINER{};
     initialGoalInfo = 0;
     for(std::list<node*>::iterator it_goal = myGoals.begin(); it_goal != myGoals.end(); it_goal++){
       //std::cout << "kommer hit? 2.1" << std::endl;
@@ -637,14 +647,110 @@ void setPath(){
         std::cout << "Test 2.1" << std::endl;
         double informationGain = SCALER_INFORMATION_GAIN * ((*it_goal)->findInformationGain(SCALER_AABB, myMap));
         std::cout << "Test 2.2" << std::endl;
-        newCost = distanceCost - informationGain;
+        linSpace(*it_goal, DISTANCE_BETWEEN_NODES);
+        std::cout << "Test 2.3" << std::endl;
+        
+        //The battleground:
+        typedef rrtCache* (*arbitrary)();
+        typedef rrtSolverStatus (*arbitrary2)(void*, double*, double*, double, double*);
+        typedef void (*rrt_clearer)(rrtCache*);
+        int i;
+        double p[RRT_NUM_PARAMETERS] = {};
+        std::list<double> xref = {};
+        std::list<double> x0 = {position_x, position_y, position_z, velocity_x, velocity_y, velocity_z, roll, pitch};
+        // Current position
+        p[0] = position_x;
+        p[1] = position_y;
+        p[2] = position_z;
+        p[3] = velocity_x;
+        p[4] = velocity_y;
+        p[5] = velocity_z;
+        p[6] = roll;
+        p[7] = pitch;
+  
+        // Trajectory
+        std::list<struct node*> EVALUATE_PATH{};
+        EVALUATE_PATH.clear();
+        (*it_goal)->getPath(&EVALUATE_PATH);
+        EVALUATE_PATH.push_back(new node((*it_goal)->point->x(), (*it_goal)->point->y(), (*it_goal)->point->z()));
+        xref.push_back((*it_goal)->point->x());
+        xref.push_back((*it_goal)->point->y());
+        xref.push_back((*it_goal)->point->z()); 
+        std::list<node*>::iterator it_evaluator = EVALUATE_PATH.begin();
+        for (i = 1; i < 51; ++i){
+          p[8*i] = (*it_evaluator)->point->x();
+          xref.push_back((*it_evaluator)->point->x());
+          p[8*i+1] = (*it_evaluator)->point->y();
+          xref.push_back((*it_evaluator)->point->y());
+          p[8*i+2] = (*it_evaluator)->point->z();
+          xref.push_back((*it_evaluator)->point->z());
+          p[8*i+3] = 0;
+          p[8*i+4] = 0;
+          p[8*i+5] = 0;
+          p[8*i+6] = 0;
+          p[8*i+7] = 0;
+          if(it_evaluator != --EVALUATE_PATH.end()){
+            it_evaluator++;
+          }
+          /*printf("%d\n", 8*i+7); */
+        }
+        p[408] = 9.81;
+        p[409] = 0;
+        p[410] = 0;
+        p[411] = 9.81;
+        p[412] = 0;
+        p[413] = 0;
+  
+        p[414] = 0.5;
+  
+        /* initial guess          */
+        double u[RRT_NUM_DECISION_VARIABLES] = {0};
+
+        for (i = 0; i < 50; ++i) {
+          u[3*i] = 9.81;
+          u[3*i + 1] = 0;
+          u[3*i + 2] = 0;
+        }
+
+        /* initial penalty        */
+        double init_penalty = 0;
+        void *handle = dlopen("./MAV/rrt/target/release/librrt.so", RTLD_LAZY);
+        if (!handle) {
+          fprintf(stderr, "%s\n", dlerror());
+          exit(EXIT_FAILURE);
+        }
+        arbitrary rrt_new;
+        *(void **) (&rrt_new) = dlsym(handle, "rrt_new");
+        // std::cout << rrt_new << std::endl;
+        rrtCache* cache = rrt_new();
+        // std::cout << cache << std::endl;
+        arbitrary2 rrt_solve;
+        *(void **) (&rrt_solve) = dlsym(handle, "rrt_solve");
+        rrt_clearer rrt_free;
+        *(void **) (&rrt_free) = dlsym(handle, "rrt_free");
+        // std::cout << rrt_free << std::endl;
+        std::cout << init_penalty << std::endl;
+        rrtSolverStatus status = rrt_solve(cache, u, p, 0, &init_penalty);
+        
+        std::list<double> uold = {9.81,0.0,0.0};
+        std::list<double> uref = {9.81,0.0,0.0};
+        
+        std::list<double> x_hist;
+        std::list<double> p_hist;
+        double cost;
+        std::tuple<std::list<double>, double, std::list<double>> trajectory(std::list<double> x, double* u, double N, double dt, std::list<double> nmpc_ref, std::list<double> u_ref, std::list<double> u_old);
+        std::tie(p_hist, cost, x_hist) = trajectory(x0, u, 50, 0.5, xref, uref, uold);
+        xref.clear();
+        // std::cout << "This is cost: " << cost << std::endl;
+        // std::cout << "This is distance cost: " << distanceCost << std::endl;
+        // std::cout << "This is informationGain: " << informationGain << std::endl;
+        newCost = distanceCost + 0.2 * cost - informationGain;
         if(informationGain > initialGoalInfo){
           initialGoalInfo = informationGain;
         }
         //std::cout << "kommer hit? 2.5" << std::endl;
-        std::cout << "Test 3" << std::endl;
-        linSpace(*it_goal, DISTANCE_BETWEEN_NODES);
-        std::cout << "Test 4" << std::endl;
+        //std::cout << "Test 3" << std::endl;
+        //std::cout << "Test 4" << std::endl;
         //std::cout << "naej" << std::endl;
         //std::cout << "My hits = " << it_goal->findInformationGain(SCALER_AABB, myMap) << std::endl;
         /*if((*it_goal) == goalNode){
@@ -663,6 +769,24 @@ void setPath(){
           totalCost = newCost;
           goalNode = *it_goal;
           newPath = true;
+          std::cout << "\n" << std::endl;
+          PATH_CONTAINER.clear();
+          PATH_CONTAINER.push_back(position_x);
+          PATH_CONTAINER.push_back(position_y);
+          PATH_CONTAINER.push_back(position_z);
+          for(std::list<double>::iterator path_itterator_helper = p_hist.begin(); path_itterator_helper != p_hist.end();){
+            double x = *path_itterator_helper;
+            PATH_CONTAINER.push_back(x);
+            path_itterator_helper++;
+            double y = *path_itterator_helper;
+            PATH_CONTAINER.push_back(y);
+            path_itterator_helper++;
+            double z = *path_itterator_helper;
+            PATH_CONTAINER.push_back(z);
+            std::cout << "This is point: " << x << ", " << y << ", " << z << std::endl;
+            path_itterator_helper++;
+          }
+          // std::cout << p_hist << std::endl;
           // initialGoalInfo = goalNode->myHits.size();
         }
       }
@@ -691,10 +815,21 @@ void setPath(){
       }
       CHOSEN_PATH.clear();
       // linSpace(goalNode, DISTANCE_BETWEEN_NODES);
-      std::cout << "Test 5" << std::endl;
-      goalNode->getPath(&CHOSEN_PATH);
+      //std::cout << "Test 5" << std::endl;
+      //goalNode->getPath(&CHOSEN_PATH);
+      std::list<double>::iterator it_path_helper = PATH_CONTAINER.begin();
+      for(int i = 0; i < 50; i++){
+        double x = *it_path_helper;
+        it_path_helper++;
+        double y = *it_path_helper;
+        it_path_helper++;
+        double z = *it_path_helper;
+        it_path_helper++;
+        CHOSEN_PATH.push_back(new node(x, y, z));
+      }
+      PATH_CONTAINER.clear();
       std::cout << "Test 6" << std::endl;
-      CHOSEN_PATH.push_back(new node(goalNode->point->x(), goalNode->point->y(), goalNode->point->z()));
+      //CHOSEN_PATH.push_back(new node(goalNode->point->x(), goalNode->point->y(), goalNode->point->z()));
       path_itterator = CHOSEN_PATH.begin();
       currentTarget = *path_itterator;
       // std::cout << currentTarget->point->x() << std::endl;
@@ -863,7 +998,7 @@ std::tuple<std::list<double>, double, std::list<double>> trajectory(std::list<do
       // std::advance(x_ref_itterator, i*ns);
       
       for(int j = 0; j < 8; j++){
-        std::cout << (*Qx_itterator) << ", " <<  (*x_itterator) << ", " << (*x_ref_itterator) << std::endl;
+        // std::cout << (*Qx_itterator) << ", " <<  (*x_itterator) << ", " << (*x_ref_itterator) << std::endl;
         cost = cost + (*Qx_itterator) * pow((*x_itterator) - (*x_ref_itterator), 2);
         Qx_itterator++;
         x_itterator++;
@@ -883,7 +1018,7 @@ std::tuple<std::list<double>, double, std::list<double>> trajectory(std::list<do
       std::list<double>::iterator u_old_itterator = u_old.begin();
       
       for(int j = 0; j < 3; j++){
-        std::cout << (*Rd_itterator) << ", " <<  u[3*i+j] << ", " << *u_old_itterator << std::endl;
+        // std::cout << (*Rd_itterator) << ", " <<  u[3*i+j] << ", " << *u_old_itterator << std::endl;
         cost = cost + *Ru_itterator * pow(u[3*i+j] - (*u_ref_itterator), 2);
         cost = cost + *Rd_itterator * pow(u[3*i+j] - *u_old_itterator, 2);
         Ru_itterator++;
@@ -891,7 +1026,7 @@ std::tuple<std::list<double>, double, std::list<double>> trajectory(std::list<do
         Rd_itterator++;
         u_ref_itterator++;
       }
-      std::cout << "this is cost" << cost << std::endl;
+      //std::cout << "this is cost" << cost << std::endl;
       u_old = {u[3*i], u[3*i+1], u[3*i+2]};
       //u_n = u[(3*i):3*i+3];
       //cost += Ru[0]*(u_n[0] - u_ref[0])**2 + Ru[1]*(u_n[1] - u_ref[1])**2 + Ru[2]*(u_n[2] - u_ref[2])**2; // Input weights
@@ -935,16 +1070,16 @@ std::tuple<std::list<double>, double, std::list<double>> trajectory(std::list<do
       x_itterator++;      
       p_hist.push_back(*x_itterator);
     }
-    std::cout << "\n" << std::endl;
-    int schme = 0;
-    std::cout << "This is p_hist:" << std::endl;
-    for(std::list<double>::iterator x5_itterator = p_hist.begin(); x5_itterator != p_hist.end(); x5_itterator++){
+    // std::cout << "\n" << std::endl;
+    //int schme = 0;
+    // std::cout << "This is p_hist:" << std::endl;
+    /*for(std::list<double>::iterator x5_itterator = p_hist.begin(); x5_itterator != p_hist.end(); x5_itterator++){
       if(schme%3 == 0 and schme != 0){
         std::cout << "\n" << std::endl;
       }
       std::cout << *x5_itterator << std::endl;
       schme++;
-    }
+    }*
     /*schme = 0;
     std::cout << "This is x_hist:\n" << std::endl;
     for(std::list<double>::iterator x4_itterator = x_hist.begin(); x4_itterator != x_hist.end(); x4_itterator++){
@@ -977,6 +1112,16 @@ void odomCallback(const nav_msgs::Odometry::ConstPtr& msg){
   position_x = msg->pose.pose.position.x;
   position_y = msg->pose.pose.position.y;
   position_z = msg->pose.pose.position.z;
+  velocity_x = msg->twist.twist.linear.x;
+  velocity_y = msg->twist.twist.linear.y;
+  velocity_z = msg->twist.twist.linear.z;
+  tf::Quaternion q(
+    msg->pose.pose.orientation.x,
+    msg->pose.pose.orientation.y,
+    msg->pose.pose.orientation.z,
+    msg->pose.pose.orientation.w);
+  tf::Matrix3x3 m(q);
+  m.getRPY(roll, pitch, yaw);
 }
 
 typedef rrtCache* (*arbitrary)();
@@ -1115,156 +1260,6 @@ int main(int argc, char *argv[])
   std::list<double> x_hist;
   std::list<double> p_hist;
   double cost;
-u[0] = 9.81657;
-u[1] = -0.0744466;
-u[2] = 0.0747712;
-u[3] = 9.81706;
-u[4] = -0.074295;
-u[5] = 0.074501;
-u[6] = 9.81655;
-u[7] = -0.0581744;
-u[8] = 0.0583658;
-u[9] = 9.81654; 
-u[10] = -0.0524646;
-u[11] = 0.0526466;
-u[12] = 9.81631;
-u[13] = -0.04143;
-u[14] = 0.0415772;
-u[15] = 9.81617;
-u[16] = -0.0347855;
-u[17] = 0.0349308;
-u[18] = 9.81601;
-u[19] = -0.0267538;
-u[20] = 0.0268732;
-u[21] = 9.81585;
-u[22] = -0.0209093;
-u[23] = 0.0210224;
-u[24] = 9.8157;
-u[25] = -0.0151124;
-u[26] = 0.0152078;
-u[27] = 9.81554;
-u[28] = -0.0106561;
-u[29] = 0.0107429;
-u[30] = 9.8154;
-u[31] = -0.00672473;
-u[32] = 0.00679869;
-u[33] = 9.81524;
-u[34] = -0.00375741;
-u[35] = 0.00382251;
-u[36] = 9.81509;
-u[37] = -0.001416;
-u[38] = 0.00147123;
-u[39] = 9.81494;
-u[40] = 0.000181533;
-u[41] = -0.000134264;
-u[42] = 9.81478;
-u[43] = 0.0012025;
-u[44] = -0.00116299;
-u[45] = 9.81462;
-u[46] = 0.00164922;
-u[47] = -0.00161635;
-u[48] = 9.81446;
-u[49] = 0.00162722;
-u[50] = -0.0016004;
-u[51] = 9.8143;
-u[52] = 0.00118186;
-u[53] = -0.00116028;
-u[54] = 9.81413;
-u[55] = 0.000394194;
-u[56] = -0.000377196;
-u[57] = 9.81397;
-u[58] = -0.000677943;
-u[59] = 0.000691029;
-u[60] = 9.8138;
-u[61] = -0.00196619;
-u[62] = 0.00197596;
-u[63] = 9.81363;
-u[64] = -0.00341272;
-u[65] = 0.00341974;
-u[66] = 9.81346;
-u[67] = -0.00495864;
-u[68] = 0.00496342;
-u[69] = 9.81329;
-u[70] = -0.00655142;
-u[71] = 0.00655441;
-u[72] = 9.81312;
-u[73] = -0.00814102;
-u[74] = 0.00814261;
-u[75] = 9.81294;
-u[76] = -0.00968236;
-u[77] = 0.00968292;
-u[78] = 9.81277;
-u[79] = -0.0111343;
-u[80] = 0.0111341;
-u[81] = 9.8126;
-u[82] = -0.0124599;
-u[83] = 0.0124592;
-u[84] = 9.81243;
-u[85] = -0.0136271;
-u[86] = 0.0136261;
-u[87] = 9.81226;
-u[88] = -0.0146077;
-u[89] = 0.0146065;
-u[90] = 9.81209;
-u[91] = -0.0153785;
-u[92] = 0.0153773;
-u[93] = 9.81192;
-u[94] = -0.01592;
-u[95] = 0.0159189;
-u[96] = 9.81176;
-u[97] = -0.016219;
-u[98] = 0.016218;
-u[99] = 9.8116;
-u[100] = -0.0162645;
-u[101] = 0.0162637;
-u[102] = 9.81144;
-u[103] = -0.0160547;
-u[104] = 0.016054;
-u[105] = 9.81129;
-u[106] = -0.0155871;
-u[107] = 0.0155866;
-u[108] = 9.81114;
-u[109] = -0.014874;
-u[110] = 0.0148737;
-u[111] = 9.81099;
-u[112] = -0.0139203;
-u[113] = 0.0139201;
-u[114] = 9.81085;
-u[115] = -0.0127585;
-u[116] = 0.0127584;
-u[117] = 9.81072;
-u[118] = -0.0113965;
-u[119] = 0.0113965;
-u[120] = 9.8106;
-u[121] = -0.00989907;
-u[122] = 0.00989915;
-u[123] = 9.81048;
-u[124] = -0.0082655;
-u[125] = 0.00826561;
-u[126] = 9.81037;
-u[127] = -0.00661732;
-u[128] = 0.00661744;
-u[129] = 9.81028;
-u[130] = -0.00491621;
-u[131] = 0.00491632;
-u[132] = 9.81019;
-u[133] = -0.00339187;
-u[134] = 0.00339196;
-u[135] = 9.81012;
-u[136] = -0.00189969;
-u[137] = 0.00189975;
-u[138] = 9.81007;
-u[139] = -0.000889274;
-u[140] = 0.000889306;
-u[141] = 9.81003;
-u[142] = 4.91992e-05;
-u[143] = -4.9197e-05;
-u[144] = 9.81001;
-u[145] = 8.69424e-09;
-u[146] = -8.68975e-09;
-u[147] = 9.81001;
-u[148] = 1.05469e-12;
-u[149] = 9.45204e-13;
   std::tie(p_hist, cost, x_hist) = trajectory(x0, u, N, dt, xref, uref, uold);
   
   /*std::cout << "p_hist " << cost << std::endl;
@@ -1546,10 +1541,12 @@ u[149] = 9.45204e-13;
       std::list<node*>::iterator it_comeon_visualizer3;	
       for(it_comeon_visualizer3 = myGoals.begin(); it_comeon_visualizer3 != myGoals.end(); it_comeon_visualizer3++){
         geometry_msgs::Point p;
+        if(*it_comeon_visualizer3 == goalNode){
         p.x = (*it_comeon_visualizer3)->point->x();
         p.y = (*it_comeon_visualizer3)->point->y();
         p.z = (*it_comeon_visualizer3)->point->z();
         GOAL_points.points.push_back(p);
+        }
       }
       goal_pub.publish(GOAL_points);
       // std::cout << "kommer hit? slut.3" << std::endl;
@@ -1649,7 +1646,7 @@ u[149] = 9.45204e-13;
     // std::cout << "kommer hit? slut.slut" << std::endl;
     // ros::spinOnce();
     // std::cout << "kommer hit? slut.slut.slut\n" << std::endl;
-    /*if(goalNode != nullptr){
+    if(goalNode != nullptr){
       for(std::list<node*>::iterator path_itterator_helper = CHOSEN_PATH.begin(); path_itterator_helper != CHOSEN_PATH.end();){
         std::cout << "target: " << (*path_itterator_helper)->point->x() << ", " << (*path_itterator_helper)->point->y() << ", " << (*path_itterator_helper)->point->z() << std::endl;
         path_itterator_helper++;
@@ -1658,7 +1655,7 @@ u[149] = 9.45204e-13;
       if(goalNode != nullptr){
         std::cout << "This is sum distance: " << goalNode->sumDistance() << std::endl;
       }
-    }*/
+    }
     if(position_received){
       visualization_msgs::Marker POSITION_point;
       POSITION_point.header.frame_id = "world";
