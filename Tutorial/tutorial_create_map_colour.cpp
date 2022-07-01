@@ -659,11 +659,11 @@ void setPath(){
         std::cout << "Test 2.3" << std::endl;
         
         //The battleground:
-        /*typedef rrtCache* (*arbitrary)();
+        typedef rrtCache* (*arbitrary)();
         typedef rrtSolverStatus (*arbitrary2)(void*, double*, double*, double, double*);
         typedef void (*rrt_clearer)(rrtCache*);
-        int i;
-        double p[RRT_NUM_PARAMETERS] = {};
+        int i = 0;
+        double p[159] = {0};
         std::list<double> xref = {};
         std::list<double> x0 = {position_x, position_y, position_z, velocity_x, velocity_y, velocity_z, roll, pitch};
         // Current position
@@ -675,51 +675,52 @@ void setPath(){
         p[5] = velocity_z;
         p[6] = roll;
         p[7] = pitch;
-  
+        std::cout << "Trajectory" << std::endl;
         // Trajectory
         std::list<struct node*> EVALUATE_PATH{};
         EVALUATE_PATH.clear();
+        std::cout << "Get path" << std::endl;
         (*it_goal)->getPath(&EVALUATE_PATH);
+        std::cout << "get path finished!" << std::endl;
         EVALUATE_PATH.push_back(new node((*it_goal)->point->x(), (*it_goal)->point->y(), (*it_goal)->point->z()));
+        std::cout << "print 1" << std::endl;
         xref.push_back((*it_goal)->point->x());
+        std::cout << "print 2" << std::endl;
         xref.push_back((*it_goal)->point->y());
+        std::cout << "print 3" << std::endl;
         xref.push_back((*it_goal)->point->z()); 
+        std::cout << "print 4" << std::endl;
         std::list<node*>::iterator it_evaluator = EVALUATE_PATH.begin();
-        for (i = 1; i < 51; i++){
-          p[8*i] = (*it_evaluator)->point->x();
+        for (i = 1; i < 51; ++i) {
+          p[8+3*i] = 0.5 * i; 
+          p[8+3*i+1] = 0.5 * i;
+          p[8+3*i+2] = 0;
+        }
+        /*for (i = 1; i < 51; ++i){
+          std::cout << i << std::endl;
+          p[8+3*i] = (*it_evaluator)->point->x();
           xref.push_back((*it_evaluator)->point->x());
-          p[8*i+1] = (*it_evaluator)->point->y();
+          p[8+3*i+1] = (*it_evaluator)->point->y();
           xref.push_back((*it_evaluator)->point->y());
-          p[8*i+2] = (*it_evaluator)->point->z();
+          p[8+3*i+2] = (*it_evaluator)->point->z();
           xref.push_back((*it_evaluator)->point->z());
-          p[8*i+3] = 0;
-          p[8*i+4] = 0;
-          p[8*i+5] = 0;
-          p[8*i+6] = 0;
-          p[8*i+7] = 0;
           if(it_evaluator != --EVALUATE_PATH.end()){
             it_evaluator++;
           }
-        }
-        p[408] = 9.81;
-        p[409] = 0;
-        p[410] = 0;
-        p[411] = 9.81;
-        p[412] = 0;
-        p[413] = 0;
-  
-        p[414] = 0.5;
+        }*/
+        std::cout << "print 5" << std::endl;
+        p[158] = 0.5;
         
-        std::cout << "This is path: " << std::endl;
+        /*std::cout << "This is path: " << std::endl;
         for(i = 0; i < 51; i++){
           std::cout << p[8*i] << ", " << p[8*i + 1] << ", " << p[8*i + 2] << std::endl;
         }
         std::cout << "This is goal: " << std::endl;
-        std::cout << (*it_goal)->point->x() << ", " << (*it_goal)->point->y() << ", " << (*it_goal)->point->z() << std::endl;
+        std::cout << (*it_goal)->point->x() << ", " << (*it_goal)->point->y() << ", " << (*it_goal)->point->z() << std::endl;*/
   
-        double u[RRT_NUM_DECISION_VARIABLES] = {0};
+        double u[150] = {0};
 
-        for (i = 0; i < 50; i++) {
+        for (i = 0; i < 50; ++i) {
           u[3*i] = 9.81;
           u[3*i + 1] = 0;
           u[3*i + 2] = 0;
@@ -750,9 +751,10 @@ void setPath(){
         std::list<double> x_hist;
         std::list<double> p_hist;
         double cost;
-        std::tuple<std::list<double>, double, std::list<double>> trajectory(std::list<double> x, double* u, double N, double dt, std::list<double> nmpc_ref, std::list<double> u_ref, std::list<double> u_old);
-        std::tie(p_hist, cost, x_hist) = trajectory(x0, u, 50, 0.5, xref, uref, uold);
+        std::tuple<std::list<double>, double, std::list<double>> trajectory(std::list<double> x, double* u, double N, double dt, std::list<double> nmpc_ref);
+        std::tie(p_hist, cost, x_hist) = trajectory(x0, u, 50, 0.5, xref);
         xref.clear();
+        rrt_free(cache);
         // std::cout << "This is cost: " << cost << std::endl;
         // std::cout << "This is distance cost: " << distanceCost << std::endl;
         // std::cout << "This is informationGain: " << informationGain << std::endl; */
@@ -782,7 +784,7 @@ void setPath(){
           totalCost = newCost;
           goalNode = *it_goal;
           newPath = true;
-          /*std::cout << "\n" << std::endl;
+          std::cout << "\n" << std::endl;
           PATH_CONTAINER.clear();
           PATH_CONTAINER.push_back(position_x);
           PATH_CONTAINER.push_back(position_y);
@@ -798,7 +800,7 @@ void setPath(){
             PATH_CONTAINER.push_back(z);
             std::cout << "This is point: " << x << ", " << y << ", " << z << std::endl;
             path_itterator_helper++;
-          }*/
+          }
           // std::cout << p_hist << std::endl;
           // initialGoalInfo = goalNode->myHits.size();
         }
@@ -827,10 +829,10 @@ void setPath(){
         // std::cout << "Deleting done 2" << std::endl;
       }
       CHOSEN_PATH.clear();
-      linSpace(goalNode, DISTANCE_BETWEEN_NODES);
+      //linSpace(goalNode, DISTANCE_BETWEEN_NODES);
       //std::cout << "Test 5" << std::endl;
-      goalNode->getPath(&CHOSEN_PATH);
-      /*std::list<double>::iterator it_path_helper = PATH_CONTAINER.begin();
+      // goalNode->getPath(&CHOSEN_PATH);
+      std::list<double>::iterator it_path_helper = PATH_CONTAINER.begin();
       for(int i = 0; i < 50; i++){
         double x = *it_path_helper;
         it_path_helper++;
@@ -840,11 +842,14 @@ void setPath(){
         it_path_helper++;
         CHOSEN_PATH.push_back(new node(x, y, z));
       }
-      PATH_CONTAINER.clear();*/
+      PATH_CONTAINER.clear();
       std::cout << "Test 6" << std::endl;
       CHOSEN_PATH.push_back(new node(goalNode->point->x(), goalNode->point->y(), goalNode->point->z()));
+      std::cout << "Test 7" << std::endl;
       path_itterator = CHOSEN_PATH.begin();
+      std::cout << "Test 8" << std::endl;
       currentTarget = *path_itterator;
+      std::cout << "Test 9" << std::endl;
       // std::cout << currentTarget->point->x() << std::endl;
       // std::cout << currentTarget->point->y() << std::endl;
       // std::cout << currentTarget->point->z() << std::endl;
@@ -985,12 +990,12 @@ void generateRRT(float given_x, float given_y, float given_z){
   }
 };
 
-std::tuple<std::list<double>, double, std::list<double>> trajectory(std::list<double> x, double* u, double N, double dt, std::list<double> nmpc_ref, std::list<double> u_ref, std::list<double> u_old){
+std::tuple<std::list<double>, double, std::list<double>> trajectory(std::list<double> x, double* u, double N, double dt, std::list<double> nmpc_ref){
     // Based on the initial condition and optimized trajectory u, computed the path as (x,y,z).
     // Calculate the dynamic costs based on selected weights  
     double ns = 8;
-    std::list<double> p_hist{};
-    std::list<double> x_hist{};
+    std::list<double> p_traj{};
+    std::list<double> v_traj{};
     double cost = 0;
     // Weight matrices
     std::list<double> Qx = {5,5,5, 0, 0,0, 5, 5};
@@ -998,6 +1003,8 @@ std::tuple<std::list<double>, double, std::list<double>> trajectory(std::list<do
     std::list<double> Ru = {15,15,15}; // input weights
     std::list<double> Rd = {10, 10, 10}; // input rate weights
     // print(x, u, N, dt)
+    std::list<double> u_old = {9.81,0.0,0.0};
+    std::list<double> u_ref = {9.81,0.0,0.0};
     for(int i = 0; i < N; i++){
       // State costs
       // std::list<float> x_ref = nmpc_ref[(ns*i):(ns*i+ns)];
@@ -1012,7 +1019,11 @@ std::tuple<std::list<double>, double, std::list<double>> trajectory(std::list<do
       
       for(int j = 0; j < 8; j++){
         // std::cout << (*Qx_itterator) << ", " <<  (*x_itterator) << ", " << (*x_ref_itterator) << std::endl;
-        cost = cost + (*Qx_itterator) * pow((*x_itterator) - (*x_ref_itterator), 2);
+        if(i < 3){
+          cost = cost + (*Qx_itterator) * pow((*x_itterator) - (*x_ref_itterator), 2);
+        }else{
+          cost = cost + (*Qx_itterator) * pow((*x_itterator), 2);
+        }
         Qx_itterator++;
         x_itterator++;
         x_ref_itterator++;
@@ -1046,9 +1057,6 @@ std::tuple<std::list<double>, double, std::list<double>> trajectory(std::list<do
       //cost += Rd[0]*(u_n[0] - u_old[0])**2 + Rd[1]*(u_n[1] - u_old[1])**2 + Rd[2]*(u_n[2] - u_old[2])**2; // Input rate weights
       //u_old = u_n;
       // x_hist = x_hist + [x];
-      for(x_itterator = x.begin(); x_itterator != x.end(); x_itterator++){
-        x_hist.push_back(*x_itterator);
-      }
       
       x_itterator = x.begin();
       std::list<double>::iterator x2_itterator = x.begin();
@@ -1061,27 +1069,33 @@ std::tuple<std::list<double>, double, std::list<double>> trajectory(std::list<do
       }
       std::list<double>::iterator x3_itterator = x.begin();
       std::advance(x3_itterator, 7); // x[7]
-      *x_itterator = *x_itterator + dt * (sin(*x3_itterator) * cos(*x2_itterator) * u[3*i] - 0.1 * (*x_itterator));
+      *x_itterator = *x_itterator + dt * (sin(*x3_itterator) * cos(*x2_itterator) * u[3*i] - 0.5 * (*x_itterator));
       // std::cout << "THIS IS IMPORTANT: " << *x_itterator << std::endl;
       x_itterator++; // x[4]
-      *x_itterator = *x_itterator + dt * (-sin(*x2_itterator) * u[3*i] - 0.1 * (*x_itterator));
+      *x_itterator = *x_itterator + dt * (-sin(*x2_itterator) * u[3*i] - 0.5 * (*x_itterator));
       x_itterator++; // x[5]
       // std::cout << "THIS IS IMPORTANT: "<< *x_itterator << ", " << *x3_itterator << ", " << *x2_itterator << ", " << u[3*i] << std::endl;
-      *x_itterator = *x_itterator + dt * (cos(*x3_itterator) * cos(*x2_itterator) * u[3*i] - 0.2 * *x_itterator - 9.81);
+      *x_itterator = *x_itterator + dt * (cos(*x3_itterator) * cos(*x2_itterator) * u[3*i] - 0.5 * *x_itterator - 9.81);
       x_itterator++;
       //u_n_itterator++;
-      *x_itterator = *x_itterator + dt * ((1.0 / 0.3) * (u[3*i + 1] - *x_itterator));
+      *x_itterator = *x_itterator + dt * ((1.0 / 0.8) * (u[3*i + 1] - *x_itterator));
       x_itterator++;
       //u_n_itterator++;
-      *x_itterator = *x_itterator + dt * ((1.0 / 0.3) * (u[3*i + 2] - *x_itterator));
+      *x_itterator = *x_itterator + dt * ((1.0 / 0.8) * (u[3*i + 2] - *x_itterator));
       /*
       p_hist = p_hist + [[x[0],x[1],x[2]]];*/
       x_itterator = x.begin();
-      p_hist.push_back(*x_itterator);
+      p_traj.push_back(*x_itterator);
       x_itterator++;
-      p_hist.push_back(*x_itterator);
+      p_traj.push_back(*x_itterator);
       x_itterator++;      
-      p_hist.push_back(*x_itterator);
+      p_traj.push_back(*x_itterator);
+      x_itterator++;
+      v_traj.push_back(*x_itterator);
+      x_itterator++;
+      v_traj.push_back(*x_itterator);
+      x_itterator++;      
+      v_traj.push_back(*x_itterator);
     }
     // std::cout << "\n" << std::endl;
     //int schme = 0;
@@ -1105,7 +1119,7 @@ std::tuple<std::list<double>, double, std::list<double>> trajectory(std::list<do
     // std::cout << cost << std::endl;
     // std::cout << x_hist << std::endl;
     // std::cout << "skibidibap: " << cost << std::endl;
-    return std::make_tuple(p_hist, cost, x_hist);
+    return std::make_tuple(v_traj, cost, p_traj);
 }
 
 void mapCallback(ufomap_msgs::UFOMapStamped::ConstPtr const& msg)
@@ -1164,7 +1178,7 @@ int main(int argc, char *argv[])
   // C++ bindings battlefield
   /* parameters             */
   int i;
-  double p[RRT_NUM_PARAMETERS] = {0};
+  double p[159] = {0};
   // Current position
   p[0] = 0;
   p[1] = 0;
@@ -1176,38 +1190,30 @@ int main(int argc, char *argv[])
   p[7] = 0;
   
   // Trajectory
-  for (i = 1; i < 51; i++) {
-    p[8*i] = 0.5*i; 
-    p[8*i+1] = 0.5*i;
-    p[8*i+2] = 0;
-    p[8*i+3] = 0;
-    p[8*i+4] = 0;
-    p[8*i+5] = 0;
-    p[8*i+6] = 0;
-    p[8*i+7] = 0;
-        /*printf("%d\n", 8*i+7); */
+  for (i = 1; i < 51; ++i) {
+    p[8+3*i] = 0.5 * i; 
+    p[8+3*i+1] = 0.5 * i;
+    p[8+3*i+2] = 0;
   }
   
-  p[408] = 9.81;
-  p[409] = 0;
-  p[410] = 0;
-  p[411] = 9.81;
-  p[412] = 0;
-  p[413] = 0;
-  
-  p[414] = 0.5;
+  p[158] = 0.5;
+  //std::cout << "This is good: " << p[8] << std::endl;
+  /*for (i = 0; i < 159; ++i) {
+    std::cout << i << std::endl;
+    printf("p[%d] = %g\n", i, p[i]);
+  }*/
   
   /* initial guess          */
-  double u[RRT_NUM_DECISION_VARIABLES] = {0};
+  double u[150] = {0};
 
-  for (i = 0; i < 50; i++) {
-    u[3*i] = 9.81;
-    u[3*i + 1] = 0;
-    u[3*i + 2] = 0;
+  for (i = 0; i < 50; ++i) {
+    u[8+3*i] = 9.81;
+    u[8+3*i+1] = 0;
+    u[8+3*i+2] = 0;
   }
 
   /* initial penalty        */
-  double init_penalty = 0.0;
+  double init_penalty = 1.0;
   void *handle = dlopen("./MAV/rrt/target/release/librrt.so", RTLD_LAZY);
   if (!handle) {
     fprintf(stderr, "%s\n", dlerror());
@@ -1225,13 +1231,15 @@ int main(int argc, char *argv[])
   std::cout << rrt_free << std::endl;
   std::cout << init_penalty << std::endl;
   rrtSolverStatus status = rrt_solve(cache, u, p, 0, &init_penalty);
+  std::cout << "This is good 2: " << p[8] << std::endl;
+  std::cout << "This is good 2: " << u[0] << std::endl;
   printf("\n\n-------------------------------------------------\n");
   printf("  Solution\n");
   printf("-------------------------------------------------\n");
 
-  for (i = 0; i < RRT_NUM_DECISION_VARIABLES; ++i) {
+  /*for (i = 0; i < RRT_NUM_DECISION_VARIABLES; ++i) {
     printf("u[%d] = %g\n", i, u[i]);
-  }
+  }*/
 
   printf("\n");
   for (i = 0; i < RRT_N1; ++i) {
@@ -1255,7 +1263,7 @@ int main(int argc, char *argv[])
   rrt_free(cache);
   
   // Trajectory battleground:
-  double N = 35;
+  double N = 50;
   double dt = 0.5;
   std::list<double> x0 = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
   std::list<double> xref_ref = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
@@ -1268,13 +1276,12 @@ int main(int argc, char *argv[])
       xref_ref_itterator_helper = xref_ref.begin();
     }
   }
-  std::list<double> uold = {9.81,0.0,0.0};
-  std::list<double> uref = {9.81,0.0,0.0};
   std::list<double> x_hist;
   std::list<double> p_hist;
   double cost;
-  std::tie(p_hist, cost, x_hist) = trajectory(x0, u, N, dt, xref, uref, uold);
-  
+  std::cout << "trajectory time" << std::endl;
+  std::tie(p_hist, cost, x_hist) = trajectory(x0, u, N, dt, xref);
+  std::cout << "trajectory time finished" << std::endl;
   /*std::cout << "p_hist " << cost << std::endl;
   
   for(std::list<float>::iterator path_itterator_helper = p_hist.begin(); path_itterator_helper != p_hist.end(); path_itterator_helper++){
@@ -1301,7 +1308,7 @@ int main(int argc, char *argv[])
   while(ros::ok()){
     high_resolution_clock::time_point start_total = high_resolution_clock::now();
     //high_resolution_clock::time_point stop_total;
-    // std::cout << "start 1" << std::endl;
+    std::cout << "start 1" << std::endl;
     if(map_received and not GOALS_generated and position_received){
       // std::cout << "start 2" << std::endl;
       tuneGeneration(myMap, false, true, false, position_x, position_y, position_z, 3);
@@ -1641,6 +1648,7 @@ int main(int argc, char *argv[])
       RRT_created = false;
       GOALS_generated = false;
       position_received = false;
+      // allowNewPath = true;
     }
     // std::cout << "kommer hit? slut.7" << std::endl;
     }
@@ -1786,9 +1794,10 @@ int main(int argc, char *argv[])
     high_resolution_clock::time_point stop_total = high_resolution_clock::now();
     auto duration_total = duration_cast<microseconds>(stop_total - start_total);
     cout << "\nExecution time: " << duration_total.count() << " micro seconds for " << myGoals.size() << " path/s." << endl;
-    /*if(allowNewPath == false){
+    if(allowNewPath == false){
       break;
-    }*/
+    }
+    std::cout << "Kom kom" << std::endl;
     ros::spinOnce();
     rate.sleep();
   }
@@ -1801,8 +1810,9 @@ int main(int argc, char *argv[])
 To run the sensors on the drone:
 
 1. sudo ptpd -M -i eno1 -C
-2. roslaunch initialization all_components.launch 
-3. roslaunch lio_sam run_ousters.launch
-4. 
+2. roslaunch initialization all_components.launch (gnc_ws)
+3. roslaunch ouster_ros ouster.launch (sensors_ws)
+4. roslaunch lio_sam run_ousters.launch (gnc_ws)
+ 
 
 */
