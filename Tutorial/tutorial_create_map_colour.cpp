@@ -691,13 +691,8 @@ void setPath(){
         xref.push_back((*it_goal)->point->z()); 
         std::cout << "print 4" << std::endl;
         std::list<node*>::iterator it_evaluator = EVALUATE_PATH.begin();
-        for (i = 1; i < 51; ++i) {
-          p[8+3*i] = 0.5 * i; 
-          p[8+3*i+1] = 0.5 * i;
-          p[8+3*i+2] = 0;
-        }
-        /*for (i = 1; i < 51; ++i){
-          std::cout << i << std::endl;
+        for (i = 1; i < 50; ++i){
+          // std::cout << i << std::endl;
           p[8+3*i] = (*it_evaluator)->point->x();
           xref.push_back((*it_evaluator)->point->x());
           p[8+3*i+1] = (*it_evaluator)->point->y();
@@ -707,7 +702,7 @@ void setPath(){
           if(it_evaluator != --EVALUATE_PATH.end()){
             it_evaluator++;
           }
-        }*/
+        }
         std::cout << "print 5" << std::endl;
         p[158] = 0.5;
         
@@ -721,6 +716,7 @@ void setPath(){
         double u[150] = {0};
 
         for (i = 0; i < 50; ++i) {
+          // std::cout << i << std::endl; 
           u[3*i] = 9.81;
           u[3*i + 1] = 0;
           u[3*i + 2] = 0;
@@ -752,7 +748,7 @@ void setPath(){
         std::list<double> p_hist;
         double cost;
         std::tuple<std::list<double>, double, std::list<double>> trajectory(std::list<double> x, double* u, double N, double dt, std::list<double> nmpc_ref);
-        std::tie(p_hist, cost, x_hist) = trajectory(x0, u, 50, 0.5, xref);
+        std::tie(x_hist, cost, p_hist) = trajectory(x0, u, 50, 0.5, xref);
         xref.clear();
         rrt_free(cache);
         // std::cout << "This is cost: " << cost << std::endl;
@@ -1190,7 +1186,7 @@ int main(int argc, char *argv[])
   p[7] = 0;
   
   // Trajectory
-  for (i = 1; i < 51; ++i) {
+  for (i = 1; i < 50; ++i) {
     p[8+3*i] = 0.5 * i; 
     p[8+3*i+1] = 0.5 * i;
     p[8+3*i+2] = 0;
@@ -1394,7 +1390,7 @@ int main(int argc, char *argv[])
       CHOSEN_PATH_points.scale.x = 0.2;
       CHOSEN_PATH_points.scale.y = 0.2;
       CHOSEN_PATH_line_list.scale.x = 0.1;
-      CHOSEN_PATH_points.color.g = 1.0f;
+      CHOSEN_PATH_points.color.r = 1.0f;
       CHOSEN_PATH_points.color.a = 1.0;
       CHOSEN_PATH_line_list.color.b = 1.0;
       CHOSEN_PATH_line_list.color.a = 1.0;
