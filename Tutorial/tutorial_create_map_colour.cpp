@@ -95,7 +95,7 @@ struct node{
         return;
       }
       
-      int findInformationGain(float SCALER_AABB, ufo::map::OccupancyMapColor const& map){
+      int findInformationGain(float SCALER_AABB, ufo::map::OccupancyMapColor const& map, bool excludePath){
         if(myHits.empty()){
           //Setting up targets, X / Y targets in either positive (P) or negative (N) direction
           ufo::math::Vector3 targetXP(point->x() + 1, point->y(), point->z());
@@ -151,8 +151,8 @@ struct node{
             }
           }
           //std::cout << "My checks: " << checks << std::endl;
-          if(myParent != nullptr){
-            myParent->findInformationGain(SCALER_AABB, map);
+          if(myParent != nullptr and not excludePath){
+            myParent->findInformationGain(SCALER_AABB, map, excludePath);
           }
         }else{
           std::list<ufo::math::Vector3>::iterator it_hits;	
@@ -538,9 +538,9 @@ void findShortestPath(){
   }
 }
 
-void generateGoals(ufo::map::OccupancyMapColor const& map){
+void generateGoals(ufo::map::OccupancyMapColor const& map, bool evaluateOldGoals){
   // Generate goals, check for occupancy status
-  if(!myGoals.empty()){ //Evaluate old goals and save the best one for backtracking
+  if(!myGoals.empty() and evaluateOldGoals){ //Evaluate old goals and save the best one for backtracking
     double newCost = std::numeric_limits<float>::max();
     double totalCost = std::numeric_limits<float>::max();
     for(std::list<node*>::iterator it_goal = myGoals.begin(); it_goal != myGoals.end(); it_goal++){
@@ -557,7 +557,8 @@ void generateGoals(ufo::map::OccupancyMapColor const& map){
         //std::cout << "Krashar efter cost calc?" << std::endl;
         double distanceCost = (*it_goal)->sumDistance() * SCALER_DISTANCE;
         // std::cout << "Test 2.1" << std::endl;
-        double informationGain = SCALER_INFORMATION_GAIN * ((*it_goal)->findInformationGain(SCALER_AABB, myMap));
+        (*it_goal)->clearInformationGain();
+        double informationGain = SCALER_INFORMATION_GAIN * ((*it_goal)->findInformationGain(SCALER_AABB, myMap, false));
         // std::cout << "Test 2.2" << std::endl;
         //linSpace(*it_goal, DISTANCE_BETWEEN_NODES);
         // std::cout << "Test 2.3" << std::endl;
@@ -680,7 +681,7 @@ void generateGoals(ufo::map::OccupancyMapColor const& map){
         bool infoRequirement = ((*it_goal)->myHits.size() > 0.2 * averageInfo or averageInfoCounter < 6);
         bool stickyFloor = ((stickyCounter < 0.8 * (*it_goal)->myHits.size()) or averageInfoCounter < 6);
         // std::cout << "This is requirements: " << (newCost < totalCost) << ((*it_goal)->findInformationGain(SCALER_AABB, myMap) > 0) << (stickyFloor and infoRequirement) << std::endl;
-        if((newCost < totalCost) and ((*it_goal)->findInformationGain(SCALER_AABB, myMap) > 0) and (stickyFloor and infoRequirement) and (*it_goal)->myParent != nullptr){
+        if((newCost < totalCost) and ((*it_goal)->findInformationGain(SCALER_AABB, myMap, false) > 0) and (stickyFloor and infoRequirement) and (*it_goal)->myParent != nullptr){
           // std::cout << newCost << " < " << totalCost << ", " << (*it_goal)->sumDistance() << " < " << 0.2 * totalDistance << std::endl;
           totalCost = newCost;
           reserveGoalNode = *it_goal;
@@ -798,7 +799,7 @@ void setPath(){
       allowNewPath = true;
       totalCost = std::numeric_limits<float>::max();
     }else{
-      totalCost = goalNode->sumDistance() * SCALER_DISTANCE - SCALER_INFORMATION_GAIN * (goalNode->findInformationGain(SCALER_AABB, myMap));
+      totalCost = goalNode->sumDistance() * SCALER_DISTANCE - SCALER_INFORMATION_GAIN * (goalNode->findInformationGain(SCALER_AABB, myMap, false));
     }
   }else{
     totalCost = std::numeric_limits<float>::max();
@@ -821,7 +822,7 @@ void setPath(){
         //std::cout << "Krashar efter cost calc?" << std::endl;
         double distanceCost = (*it_goal)->sumDistance() * SCALER_DISTANCE;
         // std::cout << "Test 2.1" << std::endl;
-        double informationGain = SCALER_INFORMATION_GAIN * ((*it_goal)->findInformationGain(SCALER_AABB, myMap));
+        double informationGain = SCALER_INFORMATION_GAIN * ((*it_goal)->findInformationGain(SCALER_AABB, myMap, false));
         // std::cout << "Test 2.2" << std::endl;
         linSpace(*it_goal, DISTANCE_BETWEEN_NODES);
         // std::cout << "Test 2.3" << std::endl;
@@ -943,7 +944,7 @@ void setPath(){
         }
         bool infoRequirement = ((*it_goal)->myHits.size() > 0.2 * averageInfo or averageInfoCounter < 6);
         bool stickyFloor = ((stickyCounter < 0.8 * (*it_goal)->myHits.size()) or averageInfoCounter < 6);
-        if((newCost < totalCost) and ((*it_goal)->findInformationGain(SCALER_AABB, myMap) > 0) and allowNewPath and (stickyFloor and infoRequirement) and (*it_goal)->myParent != nullptr){
+        if((newCost < totalCost) and ((*it_goal)->findInformationGain(SCALER_AABB, myMap, false) > 0) and allowNewPath and (stickyFloor and infoRequirement) and (*it_goal)->myParent != nullptr){
           // std::cout << newCost << " < " << totalCost << ", " << (*it_goal)->sumDistance() << " < " << 0.2 * totalDistance << std::endl;
           totalCost = newCost;
           goalNode = *it_goal;
@@ -1472,12 +1473,12 @@ int main(int argc, char *argv[])
   while(ros::ok()){
     high_resolution_clock::time_point start_total = high_resolution_clock::now();
     //high_resolution_clock::time_point stop_total;
-    // std::cout << "start 1" << std::endl;
+    std::cout << "start 1" << std::endl;
     if(map_received and not GOALS_generated and position_received){
       // std::cout << "start 2" << std::endl;
       tuneGeneration(myMap, false, true, false, position_x, position_y, position_z, 3);
       // std::cout << "start 3" << std::endl;
-      generateGoals(myMap);
+      generateGoals(myMap, true);
     }
     // std::cout << "start 4" << std::endl;
     if(map_received and not RRT_created and GOALS_generated){
@@ -1564,9 +1565,9 @@ int main(int argc, char *argv[])
         // std::cout << "kommer hit? 2" << std::endl;
         high_resolution_clock::time_point start = high_resolution_clock::now();
         // std::cout << "clock crash?" << std::endl;
-        // std::cout << "Är problemet setPath?" << std::endl;
+        std::cout << "Är problemet setPath?" << std::endl;
         setPath();
-        // std::cout << "Problemet är inte setPath!" << std::endl;
+        std::cout << "Problemet är inte setPath!" << std::endl;
         // stop_total = high_resolution_clock::now();
         high_resolution_clock::time_point stop = high_resolution_clock::now();
         // std::cout << "kommer hit? 3" << std::endl;
@@ -1581,8 +1582,8 @@ int main(int argc, char *argv[])
         // std::cout << "kommer hit? 5" << std::endl;
         // high_resolution_clock::time_point stop = high_resolution_clock::now();
         auto duration = duration_cast<microseconds>(stop - start);
-        cout << "\nExecution time: " << duration.count() << " micro seconds for " << myGoals.size() << " path/s." << endl;
-        // std::cout << "kommer hit? 6" << std::endl;
+        cout << "\nExecution time: " << duration.count() << " micro seconds for " << myGoals.size() << " path/s. asdf" << endl;
+        std::cout << "kommer hit? 6" << std::endl;
         if(newPath and allowNewPath){
           // std::cout << "kommer hit? 6.1" << std::endl;
           newPath = false;
@@ -1595,7 +1596,7 @@ int main(int argc, char *argv[])
           // std::cout << currentTarget << std::endl;
           // std::cout << "kommer hit? 6.3" << std::endl;
         };
-        // std::cout << "kommer hit? 7" << std::endl;
+        std::cout << "kommer hit? 7" << std::endl;
         std::list<node*>::iterator it_comeon_visualizer2;
         if(!CHOSEN_PATH.empty()){	
           for(it_comeon_visualizer2 = CHOSEN_PATH.begin(); it_comeon_visualizer2 != CHOSEN_PATH.end(); it_comeon_visualizer2++){
@@ -1629,7 +1630,7 @@ int main(int argc, char *argv[])
       
         // chosen_path_pub.publish(MY_CHOSEN_PATH);
       
-      
+        std::cout << "kommer hit? 8" << std::endl;
         PATH_points.header.frame_id = PATH_line_list.header.frame_id = "world";
         PATH_points.ns = "points";
         PATH_points.action = visualization_msgs::Marker::ADD;
@@ -1674,7 +1675,7 @@ int main(int argc, char *argv[])
         all_path_pub.publish(PATH_line_list);
         // std::cout << "kommer hit? slut" << std::endl;
       }
-      // std::cout << "kommer hit? slut.2" << std::endl;
+      std::cout << "kommer hit? slut.2" << std::endl;
       GOAL_points.header.frame_id = "world";
       GOAL_points.ns = "points";
       GOAL_points.action = visualization_msgs::Marker::ADD;
@@ -1696,7 +1697,7 @@ int main(int argc, char *argv[])
         //}
       }
       goal_pub.publish(GOAL_points);
-      // std::cout << "kommer hit? slut.3" << std::endl;
+      std::cout << "kommer hit? slut.3" << std::endl;
       
       if(goalNode != nullptr){
         hits.clear();
@@ -1767,17 +1768,31 @@ int main(int argc, char *argv[])
         // std::cout << "kommer hit? slut.6" << std::endl;
         // std::cout << "kommer hit? slut.7" << std::endl;
       }
-      if(fetched_path){  
+      std::cout << "kommer hit? 714" << std::endl;
+      if(fetched_path and goalNode != nullptr){  
         itterations++;
+        std::cout << "kommer hit? 715" << std::endl;
         if(sqrt(pow(position_x - goalNode->point->x(), 2) + pow(position_y - goalNode->point->y(), 2) + pow(position_z - goalNode->point->z(), 2)) < 0.5){
+          std::cout << "kommer hit? 716" << std::endl;
           itterations = 0;
           fetched_path = false;
           RRT_created = false;
           GOALS_generated = false;
           position_received = false;
-          // allowNewPath = true;
+          //allowNewPath = true;
+          if(recoveryUnderway){
+            for(std::list<node*>::iterator erase_reserveGoal_it = myReserveGoals.end(); erase_reserveGoal_it != myReserveGoals.begin(); erase_reserveGoal_it--){
+              if(*erase_reserveGoal_it == goalNode){
+                myReserveGoals.erase(erase_reserveGoal_it);
+                goalNode = nullptr;
+                std::cout << "Old reserve goal deleted, new size is now: " << myReserveGoals.size() << std::endl;
+                allowNewPath = true;
+                break;
+              }
+            }
+          }
         }
-        // std::cout << "Kommer hit? slut.0" << std::endl;
+        std::cout << "Kommer hit? slut.0" << std::endl;
         if((sqrt(pow(position_x - currentTarget->point->x(), 2) + pow(position_y - currentTarget->point->y(), 2) + pow(position_z - currentTarget->point->z(), 2)) < 0.5) and path_itterator != --CHOSEN_PATH.end()){
           // std::cout << "Kommer hit? slut.0.1" << std::endl;
           //path_itterator++;
@@ -1819,7 +1834,7 @@ int main(int argc, char *argv[])
       bool compress = false;
       ufo::map::DepthType pub_depth = 0;
       // Convert UFOMap to ROS message
-      // std::cout << "kommer hit? slut.8" << std::endl;
+      std::cout << "kommer hit? slut.8" << std::endl;
       if (ufomap_msgs::ufoToMsg(myMap, msg->map, compress, pub_depth)) {
         //std::cout << "Map conversion success!" << std::endl;
         // Conversion was successful
@@ -1862,20 +1877,20 @@ int main(int argc, char *argv[])
         position_pub.publish(POSITION_point);
       }
       std::cout << "This is my position: " << position_x << ", " << position_y << ", " << position_z << std::endl;
-      if(currentTarget != nullptr){
+      /*if(currentTarget != nullptr){
         std::cout << "This is my current target: " << currentTarget->point->x() << ", " << currentTarget->point->y() << ", " << currentTarget->point->z() << std::endl;
         // std::cout << sqrt(pow(position_x - currentTarget->point->x(), 2) + pow(position_y - currentTarget->point->y(), 2) + pow(position_z - currentTarget->point->z(), 2)) << " < " << 0.5 << std::endl;
-      }
+      }*/
       // std::cout << advance_index << std::endl;
       // std::cout << fetched_path << std::endl;
-      if(goalNode != nullptr or (goalNode == nullptr and GOALS_generated)){
+      if((goalNode != nullptr or (goalNode == nullptr and GOALS_generated)) or averageInfoCounter > 2){
         // std::cout << "This is my found infoGain for the chosen path: " << goalNode->myHits.size() << std::endl;
         std::cout << "This is my average infoGain: " << averageInfo << std::endl;
         std::cout << "This is my infoGain counter: " << averageInfoCounter << std::endl;
         std::cout << "This is my goalNodes infogain: " << initialGoalInfo << std::endl;
         if(initialGoalInfo < (0.2 * averageInfo) and averageInfoCounter > 5 and not recoveryUnderway){
           for(int i = 0; i < 3; i++){
-            generateGoals(myMap);
+            generateGoals(myMap, false);
             generateRRT(position_x, position_y, position_z);
             allowNewPath = true;
             setPath();
@@ -1884,35 +1899,56 @@ int main(int argc, char *argv[])
             }
           }
         }
-        if(initialGoalInfo < (0.2 * averageInfo) and averageInfoCounter > 5 and not recoveryUnderway){
+        if((initialGoalInfo < (0.2 * averageInfo) and averageInfoCounter > 5 and not recoveryUnderway)){
           /*
           1. Evaluate last added reserveGoal, remove if informationGain is too low ( informationGain < 20)
           2. Itterate through the visited points until one passes the collision check to the goal (line check / sphear check?)
           3. Add to CHOSEN_PATH and set variables accordingly.
           */
           std::cout << "TRIGGER!" << std::endl;
-          for(std::list<node*>::iterator retrace_path_itterator = --myReserveGoals.end(); retrace_path_itterator != myReserveGoals.begin(); retrace_path_itterator++){
+          for(std::list<node*>::iterator retrace_path_itterator = --myReserveGoals.end(); retrace_path_itterator != myReserveGoals.begin(); retrace_path_itterator--){
             std::cout << "global planner 1" << std::endl;
-            for(std::list<node*>::iterator it_clear_helper = CHOSEN_PATH.begin(); it_clear_helper != --CHOSEN_PATH.end(); it_clear_helper++){
-              //std::cout << "Deleting 1" << std::endl;
-              std::cout << "global planner 2" << std::endl;
-              (*it_clear_helper)->readyForDeletion();
-              delete(*it_clear_helper);
-              //std::cout << "Deleting 2" << std::endl;
+            if(!CHOSEN_PATH.empty()){
+              for(std::list<node*>::iterator it_clear_helper = CHOSEN_PATH.begin(); it_clear_helper != --CHOSEN_PATH.end(); it_clear_helper++){
+                //std::cout << "Deleting 1" << std::endl;
+                std::cout << "global planner 2" << std::endl;
+                (*it_clear_helper)->readyForDeletion();
+                delete(*it_clear_helper);
+                //std::cout << "Deleting 2" << std::endl;
+              }
+              //std::cout << "Deleting done" << std::endl;
+              std::cout << "global planner 3" << std::endl;
+              CHOSEN_PATH.clear();
             }
-            //std::cout << "Deleting done" << std::endl;
-            std::cout << "global planner 3" << std::endl;
-            CHOSEN_PATH.clear();
             std::cout << "global planner 4" << std::endl;
-            (*retrace_path_itterator)->findPathImprovement(*retrace_path_itterator, myMap, DISTANCE_BETWEEN_NODES, radius);
+            (*retrace_path_itterator)->clearInformationGain();
             std::cout << "global planner 5" << std::endl;
-            linSpace(*retrace_path_itterator, DISTANCE_BETWEEN_NODES); // Core dump here?
+            double informationGain = (*retrace_path_itterator)->findInformationGain(SCALER_AABB, myMap, true);
             std::cout << "global planner 6" << std::endl;
-            (*retrace_path_itterator)->getPath(&CHOSEN_PATH);
-            std::cout << "global planner 7" << std::endl;
-            recoveryUnderway = true;
-            std::cout << "global planner 8" << std::endl;
-            break;
+            if(informationGain > 0.2 * averageInfo){
+              (*retrace_path_itterator)->findPathImprovement(*retrace_path_itterator, myMap, DISTANCE_BETWEEN_NODES, radius);
+              std::cout << "global planner 7" << std::endl;
+              // linSpace(*retrace_path_itterator, DISTANCE_BETWEEN_NODES); // Core dump here?
+              // std::cout << "global planner 6" << std::endl;
+              (*retrace_path_itterator)->getPath(&CHOSEN_PATH);
+              CHOSEN_PATH.push_back(new node((*retrace_path_itterator)->point->x(), (*retrace_path_itterator)->point->y(), (*retrace_path_itterator)->point->z()));
+              std::cout << "global planner 8" << std::endl;
+              goalNode = *retrace_path_itterator;
+              path_itterator = CHOSEN_PATH.begin();
+              currentTarget = *path_itterator;
+              advance_index = 0;
+              allowNewPath = false;
+              recoveryUnderway = true;
+              std::list<node*>::iterator erase_it = myReserveGoals.end();
+              retrace_path_itterator++;
+              myReserveGoals.erase(retrace_path_itterator, erase_it);
+              std::cout << "global planner 9" << std::endl;
+              break;
+            }else{
+              myReserveGoals.erase(retrace_path_itterator);
+              std::cout << "This is the size of reserve goals: " << myReserveGoals.size() << std::endl;
+            }
+            
           }
           /*std::list<node*>::iterator retrace_path_itterator = --VISITED_POINTS.end();
           node* lastChecked = *retrace_path_itterator;
@@ -1988,6 +2024,17 @@ int main(int argc, char *argv[])
     /*if(allowNewPath == false){
       break;
     }*/
+    /*if(!myReserveGoals.empty()){
+      std::list<node*>::iterator reserveGoalItterator = --myReserveGoals.end();
+      std::cout << "This is the most recent reserve goal: " << (*reserveGoalItterator)->myParent->point->x() << ", " << (*reserveGoalItterator)->myParent->point->y() << ", " << (*reserveGoalItterator)->myParent->point->z() << std::endl;
+    }*/
+    if(!CHOSEN_PATH.empty() and recoveryUnderway){
+      std::cout << "Let's try to print the path!" << std::endl;
+      for(std::list<node*>::iterator path_itterator_helper = CHOSEN_PATH.begin(); path_itterator_helper != CHOSEN_PATH.end();){
+        std::cout << "target: " << (*path_itterator_helper)->point->x() << ", " << (*path_itterator_helper)->point->y() << ", " << (*path_itterator_helper)->point->z() << std::endl;
+        path_itterator_helper++;
+      }
+    }
     std::cout << "This is size of reserveGoals: "  << myReserveGoals.size() << std::endl;
     ros::spinOnce();
     rate.sleep();
