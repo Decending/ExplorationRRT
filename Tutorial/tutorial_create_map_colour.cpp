@@ -558,7 +558,7 @@ void generateGoals(ufo::map::OccupancyMapColor const& map, bool evaluateOldGoals
         double distanceCost = (*it_goal)->sumDistance() * SCALER_DISTANCE;
         // std::cout << "Test 2.1" << std::endl;
         (*it_goal)->clearInformationGain();
-        double informationGain = SCALER_INFORMATION_GAIN * ((*it_goal)->findInformationGain(SCALER_AABB, myMap, false));
+        double informationGain = SCALER_INFORMATION_GAIN * ((*it_goal)->findInformationGain(SCALER_AABB, myMap, true));
         // std::cout << "Test 2.2" << std::endl;
         //linSpace(*it_goal, DISTANCE_BETWEEN_NODES);
         // std::cout << "Test 2.3" << std::endl;
@@ -1780,7 +1780,7 @@ int main(int argc, char *argv[])
           GOALS_generated = false;
           position_received = false;
           //allowNewPath = true;
-          if(recoveryUnderway){
+          /*if(recoveryUnderway){
             for(std::list<node*>::iterator erase_reserveGoal_it = myReserveGoals.end(); erase_reserveGoal_it != myReserveGoals.begin(); erase_reserveGoal_it--){
               if(*erase_reserveGoal_it == goalNode){
                 myReserveGoals.erase(erase_reserveGoal_it);
@@ -1790,7 +1790,7 @@ int main(int argc, char *argv[])
                 break;
               }
             }
-          }
+          }*/
         }
         std::cout << "Kommer hit? slut.0" << std::endl;
         if((sqrt(pow(position_x - currentTarget->point->x(), 2) + pow(position_y - currentTarget->point->y(), 2) + pow(position_z - currentTarget->point->z(), 2)) < 0.5) and path_itterator != --CHOSEN_PATH.end()){
@@ -1931,10 +1931,12 @@ int main(int argc, char *argv[])
               // linSpace(*retrace_path_itterator, DISTANCE_BETWEEN_NODES); // Core dump here?
               // std::cout << "global planner 6" << std::endl;
               (*retrace_path_itterator)->getPath(&CHOSEN_PATH);
+              
               CHOSEN_PATH.push_back(new node((*retrace_path_itterator)->point->x(), (*retrace_path_itterator)->point->y(), (*retrace_path_itterator)->point->z()));
               std::cout << "global planner 8" << std::endl;
               goalNode = *retrace_path_itterator;
               path_itterator = CHOSEN_PATH.begin();
+              
               currentTarget = *path_itterator;
               advance_index = 0;
               allowNewPath = false;
@@ -1944,10 +1946,10 @@ int main(int argc, char *argv[])
               myReserveGoals.erase(retrace_path_itterator, erase_it);
               std::cout << "global planner 9" << std::endl;
               break;
-            }else{
+            }/*else{
               myReserveGoals.erase(retrace_path_itterator);
               std::cout << "This is the size of reserve goals: " << myReserveGoals.size() << std::endl;
-            }
+            }*/
             
           }
           /*std::list<node*>::iterator retrace_path_itterator = --VISITED_POINTS.end();
