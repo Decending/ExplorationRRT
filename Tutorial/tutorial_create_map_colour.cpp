@@ -345,7 +345,7 @@ float SCALER_AABB = 20;
 float SCALER_X = SCALER_AABB;
 float SCALER_Y = SCALER_AABB;
 float SCALER_Z = SCALER_AABB;
-double radius = 0.4; // 1.0;
+double radius = 1.0; // 0.5;
 bool map_received = false;
 bool RRT_created = false;
 bool GOALS_generated = false;
@@ -1930,8 +1930,35 @@ int main(int argc, char *argv[])
               std::cout << "global planner 7" << std::endl;
               // linSpace(*retrace_path_itterator, DISTANCE_BETWEEN_NODES); // Core dump here?
               // std::cout << "global planner 6" << std::endl;
-              (*retrace_path_itterator)->getPath(&CHOSEN_PATH);
-              
+              std::list<struct node*> PATH_CONTAINER{};
+              node* currentPoint = nullptr;
+              node* savedPoint = nullptr;
+              (*retrace_path_itterator)->getPath(&PATH_CONTAINER);
+              PATH_CONTAINER.push_back(new node((*retrace_path_itterator)->point->x(), (*retrace_path_itterator)->point->y(), (*retrace_path_itterator)->point->z()));
+              for(std::list<node*>::iterator it_path_helper1 = PATH_CONTAINER.begin(); it_path_helper1 != PATH_CONTAINER.end(); it_path_helper1++){ //This doesn't shorten the paths correctly, it can only attatch to a point it has direct vision of and if the path goes around a corner and comes back it will still take that route instead of cutting out the roundabout.
+                if(it_path_helper1 == --PATH_CONTAINER.end()){
+                  CHOSEN_PATH.push_back(*it_path_helper1);
+                  break;
+                }
+                if(CHOSEN_PATH.empty()){ //If path is empty, add first point to path and save it as the currentPoint to go from
+                  CHOSEN_PATH.push_back(*it_path_helper1);
+                  currentPoint = *it_path_helper1;
+                }else{ // Otherwise, see if the first point can reach the next point in the path, if that's the case, save the point that was reached and step it_path_helper
+                  ufo::geometry::LineSegment myLine(*(currentPoint->point), (*(*it_path_helper1)->point));
+                  if(!isInCollision(myMap, myLine, true, false, true, 3)){ // If we're not in collision, save the reached point
+                    savedPoint = *it_path_helper1;
+                  }else{ // If we can't reach the new point, save the previous point found
+                    CHOSEN_PATH.push_back(savedPoint);
+                    currentPoint = savedPoint;
+                    ufo::geometry::LineSegment myLine(*(currentPoint->point), *((*it_path_helper1)->point));
+                    if(!isInCollision(myMap, myLine, true, false, true, 3)){ // Evaluate the point we pushed to the path and make sure we can reach the point the itterator is pointing to
+                      savedPoint = *it_path_helper1;
+                    }else{
+                      savedPoint = currentPoint;
+                    }
+                  }
+                }
+              }
               CHOSEN_PATH.push_back(new node((*retrace_path_itterator)->point->x(), (*retrace_path_itterator)->point->y(), (*retrace_path_itterator)->point->z()));
               std::cout << "global planner 8" << std::endl;
               goalNode = *retrace_path_itterator;
