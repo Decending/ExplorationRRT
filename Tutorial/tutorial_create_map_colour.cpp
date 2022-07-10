@@ -678,7 +678,7 @@ void generateGoals(ufo::map::OccupancyMapColor const& map, bool evaluateOldGoals
             stickyCounter++;
           }
         }
-        bool infoRequirement = ((*it_goal)->myHits.size() > 0.2 * averageInfo or averageInfoCounter < 6);
+        bool infoRequirement = ((*it_goal)->myHits.size() > 0.1 * averageInfo or averageInfoCounter < 6);
         bool stickyFloor = ((stickyCounter < 0.8 * (*it_goal)->myHits.size()) or averageInfoCounter < 6);
         // std::cout << "This is requirements: " << (newCost < totalCost) << ((*it_goal)->findInformationGain(SCALER_AABB, myMap) > 0) << (stickyFloor and infoRequirement) << std::endl;
         if((newCost < totalCost) and ((*it_goal)->findInformationGain(SCALER_AABB, myMap, false) > 0) and (stickyFloor and infoRequirement) and (*it_goal)->myParent != nullptr){
@@ -1925,17 +1925,52 @@ int main(int argc, char *argv[])
             std::cout << "global planner 5" << std::endl;
             double informationGain = (*retrace_path_itterator)->findInformationGain(SCALER_AABB, myMap, true);
             std::cout << "global planner 6" << std::endl;
-            if(informationGain > 0.2 * averageInfo){
+            if(informationGain > 0.1 * averageInfo){
               (*retrace_path_itterator)->findPathImprovement(*retrace_path_itterator, myMap, DISTANCE_BETWEEN_NODES, radius);
               std::cout << "global planner 7" << std::endl;
               // linSpace(*retrace_path_itterator, DISTANCE_BETWEEN_NODES); // Core dump here?
               // std::cout << "global planner 6" << std::endl;
               std::list<struct node*> PATH_CONTAINER{};
-              node* currentPoint = nullptr;
-              node* savedPoint = nullptr;
               (*retrace_path_itterator)->getPath(&PATH_CONTAINER);
               PATH_CONTAINER.push_back(new node((*retrace_path_itterator)->point->x(), (*retrace_path_itterator)->point->y(), (*retrace_path_itterator)->point->z()));
-              for(std::list<node*>::iterator it_path_helper1 = PATH_CONTAINER.begin(); it_path_helper1 != PATH_CONTAINER.end(); it_path_helper1++){ //This doesn't shorten the paths correctly, it can only attatch to a point it has direct vision of and if the path goes around a corner and comes back it will still take that route instead of cutting out the roundabout.
+              CHOSEN_PATH.push_back(*(PATH_CONTAINER.begin()));
+              node* currentPoint = *(PATH_CONTAINER.begin());
+              node* savedPoint = nullptr;
+              int myIndex = 0;
+              int mySavedIndex = 0;
+              // std::cout << "My new planner 1" << std::endl;
+              while(currentPoint != *(--PATH_CONTAINER.end())){
+                std::cout << "This is size: " << PATH_CONTAINER.size() << std::endl;
+                std::cout << "This is index: " << myIndex << std::endl;
+                // std::cout << "My new planner 2" << std::endl;
+                std::list<node*>::iterator it_path_helper1 = PATH_CONTAINER.begin();
+                // std::cout << "My new planner 3" << std::endl;
+                std::advance(it_path_helper1, advance_index);
+                // std::cout << "My new planner 4" << std::endl;
+                while(it_path_helper1 != PATH_CONTAINER.end()){
+                  // std::cout << "My new planner 5" << std::endl;
+                  ufo::geometry::LineSegment myLine(*(currentPoint->point), (*(*it_path_helper1)->point));
+                  // std::cout << "My new planner 6" << std::endl;
+                  if(!isInCollision(myMap, myLine, true, false, true, 3)){
+                    // std::cout << "My new planner 7" << std::endl;
+                    savedPoint = *(it_path_helper1);
+                    // std::cout << "My new planner 8" << std::endl;
+                    mySavedIndex = myIndex;
+                    // std::cout << "My new planner 9" << std::endl;
+                  }
+                  // std::cout << "My new planner 10" << std::endl;
+                  myIndex++;
+                  // std::cout << "My new planner 11" << std::endl;
+                  it_path_helper1++;
+                  // std::cout << "My new planner 12" << std::endl;
+                }
+                std::cout << "My new planner 13" << std::endl;
+                currentPoint = savedPoint;
+                std::cout << "My new planner 14" << std::endl;
+                CHOSEN_PATH.push_back(savedPoint);
+                std::cout << "My new planner 15" << std::endl;
+              }
+              /*for(std::list<node*>::iterator it_path_helper1 = PATH_CONTAINER.begin(); it_path_helper1 != PATH_CONTAINER.end(); it_path_helper1++){ //This doesn't shorten the paths correctly, it can only attatch to a point it has direct vision of and if the path goes around a corner and comes back it will still take that route instead of cutting out the roundabout. Take the starting point and loop through the entire path, find the best shortcut, do the same for the point you shortcutted to, etc, etc.
                 if(it_path_helper1 == --PATH_CONTAINER.end()){
                   CHOSEN_PATH.push_back(*it_path_helper1);
                   break;
@@ -1958,12 +1993,11 @@ int main(int argc, char *argv[])
                     }
                   }
                 }
-              }
+              }*/
               CHOSEN_PATH.push_back(new node((*retrace_path_itterator)->point->x(), (*retrace_path_itterator)->point->y(), (*retrace_path_itterator)->point->z()));
               std::cout << "global planner 8" << std::endl;
               goalNode = *retrace_path_itterator;
               path_itterator = CHOSEN_PATH.begin();
-              
               currentTarget = *path_itterator;
               advance_index = 0;
               allowNewPath = false;
