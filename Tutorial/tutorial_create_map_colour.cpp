@@ -692,16 +692,16 @@ void generateGoals(ufo::map::OccupancyMapColor const& map, bool evaluateOldGoals
     }
     if(reserveGoalNode != nullptr){
       myReserveGoals.push_back(reserveGoalNode);
-      std::cout << "testy test" << std::endl;
+      // std::cout << "testy test" << std::endl;
       for(std::list<node*>::iterator it_parent_finder = --VISITED_POINTS.end(); it_parent_finder != VISITED_POINTS.begin(); it_parent_finder--){
         ufo::geometry::LineSegment myLine((*(*it_parent_finder)->point), (*reserveGoalNode->point));
-        std::cout << "oh, we be printin!" << std::endl;
+        // std::cout << "oh, we be printin!" << std::endl;
         if(!isInCollision(map, myLine, true, false, true, 3)){
           reserveGoalNode->addParent((*it_parent_finder));
           break;
         }
       }
-    std::cout << "got out" << std::endl;
+    // std::cout << "got out" << std::endl;
     }
   }
   if(goalNode != nullptr){
@@ -1473,7 +1473,7 @@ int main(int argc, char *argv[])
   while(ros::ok()){
     high_resolution_clock::time_point start_total = high_resolution_clock::now();
     //high_resolution_clock::time_point stop_total;
-    std::cout << "start 1" << std::endl;
+    // std::cout << "start 1" << std::endl;
     if(map_received and not GOALS_generated and position_received){
       // std::cout << "start 2" << std::endl;
       tuneGeneration(myMap, false, true, false, position_x, position_y, position_z, 3);
@@ -1565,9 +1565,9 @@ int main(int argc, char *argv[])
         // std::cout << "kommer hit? 2" << std::endl;
         high_resolution_clock::time_point start = high_resolution_clock::now();
         // std::cout << "clock crash?" << std::endl;
-        std::cout << "Är problemet setPath?" << std::endl;
+        // std::cout << "Är problemet setPath?" << std::endl;
         setPath();
-        std::cout << "Problemet är inte setPath!" << std::endl;
+        // std::cout << "Problemet är inte setPath!" << std::endl;
         // stop_total = high_resolution_clock::now();
         high_resolution_clock::time_point stop = high_resolution_clock::now();
         // std::cout << "kommer hit? 3" << std::endl;
@@ -1583,7 +1583,7 @@ int main(int argc, char *argv[])
         // high_resolution_clock::time_point stop = high_resolution_clock::now();
         auto duration = duration_cast<microseconds>(stop - start);
         cout << "\nExecution time: " << duration.count() << " micro seconds for " << myGoals.size() << " path/s. asdf" << endl;
-        std::cout << "kommer hit? 6" << std::endl;
+        // std::cout << "kommer hit? 6" << std::endl;
         if(newPath and allowNewPath){
           // std::cout << "kommer hit? 6.1" << std::endl;
           newPath = false;
@@ -1596,7 +1596,7 @@ int main(int argc, char *argv[])
           // std::cout << currentTarget << std::endl;
           // std::cout << "kommer hit? 6.3" << std::endl;
         };
-        std::cout << "kommer hit? 7" << std::endl;
+        // std::cout << "kommer hit? 7" << std::endl;
         std::list<node*>::iterator it_comeon_visualizer2;
         if(!CHOSEN_PATH.empty()){	
           for(it_comeon_visualizer2 = CHOSEN_PATH.begin(); it_comeon_visualizer2 != CHOSEN_PATH.end(); it_comeon_visualizer2++){
@@ -1630,7 +1630,7 @@ int main(int argc, char *argv[])
       
         // chosen_path_pub.publish(MY_CHOSEN_PATH);
       
-        std::cout << "kommer hit? 8" << std::endl;
+        // std::cout << "kommer hit? 8" << std::endl;
         PATH_points.header.frame_id = PATH_line_list.header.frame_id = "world";
         PATH_points.ns = "points";
         PATH_points.action = visualization_msgs::Marker::ADD;
@@ -1675,7 +1675,7 @@ int main(int argc, char *argv[])
         all_path_pub.publish(PATH_line_list);
         // std::cout << "kommer hit? slut" << std::endl;
       }
-      std::cout << "kommer hit? slut.2" << std::endl;
+      // std::cout << "kommer hit? slut.2" << std::endl;
       GOAL_points.header.frame_id = "world";
       GOAL_points.ns = "points";
       GOAL_points.action = visualization_msgs::Marker::ADD;
@@ -1697,7 +1697,7 @@ int main(int argc, char *argv[])
         //}
       }
       goal_pub.publish(GOAL_points);
-      std::cout << "kommer hit? slut.3" << std::endl;
+      // std::cout << "kommer hit? slut.3" << std::endl;
       
       if(goalNode != nullptr){
         hits.clear();
@@ -1768,12 +1768,12 @@ int main(int argc, char *argv[])
         // std::cout << "kommer hit? slut.6" << std::endl;
         // std::cout << "kommer hit? slut.7" << std::endl;
       }
-      std::cout << "kommer hit? 714" << std::endl;
+      // std::cout << "kommer hit? 714" << std::endl;
       if(fetched_path and goalNode != nullptr){  
         itterations++;
-        std::cout << "kommer hit? 715" << std::endl;
+        // std::cout << "kommer hit? 715" << std::endl;
         if(sqrt(pow(position_x - goalNode->point->x(), 2) + pow(position_y - goalNode->point->y(), 2) + pow(position_z - goalNode->point->z(), 2)) < 0.5){
-          std::cout << "kommer hit? 716" << std::endl;
+          // std::cout << "kommer hit? 716" << std::endl;
           itterations = 0;
           fetched_path = false;
           RRT_created = false;
@@ -1792,7 +1792,7 @@ int main(int argc, char *argv[])
             }
           }*/
         }
-        std::cout << "Kommer hit? slut.0" << std::endl;
+        // std::cout << "Kommer hit? slut.0" << std::endl;
         if((sqrt(pow(position_x - currentTarget->point->x(), 2) + pow(position_y - currentTarget->point->y(), 2) + pow(position_z - currentTarget->point->z(), 2)) < 0.5) and path_itterator != --CHOSEN_PATH.end()){
           // std::cout << "Kommer hit? slut.0.1" << std::endl;
           //path_itterator++;
@@ -1834,7 +1834,7 @@ int main(int argc, char *argv[])
       bool compress = false;
       ufo::map::DepthType pub_depth = 0;
       // Convert UFOMap to ROS message
-      std::cout << "kommer hit? slut.8" << std::endl;
+      // std::cout << "kommer hit? slut.8" << std::endl;
       if (ufomap_msgs::ufoToMsg(myMap, msg->map, compress, pub_depth)) {
         //std::cout << "Map conversion success!" << std::endl;
         // Conversion was successful
@@ -1907,27 +1907,27 @@ int main(int argc, char *argv[])
           */
           std::cout << "TRIGGER!" << std::endl;
           for(std::list<node*>::iterator retrace_path_itterator = --myReserveGoals.end(); retrace_path_itterator != myReserveGoals.begin(); retrace_path_itterator--){
-            std::cout << "global planner 1" << std::endl;
+            // std::cout << "global planner 1" << std::endl;
             if(!CHOSEN_PATH.empty()){
               for(std::list<node*>::iterator it_clear_helper = CHOSEN_PATH.begin(); it_clear_helper != --CHOSEN_PATH.end(); it_clear_helper++){
                 //std::cout << "Deleting 1" << std::endl;
-                std::cout << "global planner 2" << std::endl;
+                // std::cout << "global planner 2" << std::endl;
                 (*it_clear_helper)->readyForDeletion();
                 delete(*it_clear_helper);
                 //std::cout << "Deleting 2" << std::endl;
               }
               //std::cout << "Deleting done" << std::endl;
-              std::cout << "global planner 3" << std::endl;
+              // std::cout << "global planner 3" << std::endl;
               CHOSEN_PATH.clear();
             }
-            std::cout << "global planner 4" << std::endl;
+            // std::cout << "global planner 4" << std::endl;
             (*retrace_path_itterator)->clearInformationGain();
-            std::cout << "global planner 5" << std::endl;
+            // std::cout << "global planner 5" << std::endl;
             double informationGain = (*retrace_path_itterator)->findInformationGain(SCALER_AABB, myMap, true);
-            std::cout << "global planner 6" << std::endl;
+            // std::cout << "global planner 6" << std::endl;
             if(informationGain > 0.1 * averageInfo){
               (*retrace_path_itterator)->findPathImprovement(*retrace_path_itterator, myMap, DISTANCE_BETWEEN_NODES, radius);
-              std::cout << "global planner 7" << std::endl;
+              // std::cout << "global planner 7" << std::endl;
               // linSpace(*retrace_path_itterator, DISTANCE_BETWEEN_NODES); // Core dump here?
               // std::cout << "global planner 6" << std::endl;
               std::list<struct node*> PATH_CONTAINER{};
@@ -1940,8 +1940,8 @@ int main(int argc, char *argv[])
               int mySavedIndex = 0;
               // std::cout << "My new planner 1" << std::endl;
               while(currentPoint != *(--PATH_CONTAINER.end())){
-                std::cout << "This is size: " << PATH_CONTAINER.size() << std::endl;
-                std::cout << "This is index: " << myIndex << std::endl;
+                // std::cout << "This is size: " << PATH_CONTAINER.size() << std::endl;
+                // std::cout << "This is index: " << myIndex << std::endl;
                 // std::cout << "My new planner 2" << std::endl;
                 std::list<node*>::iterator it_path_helper1 = PATH_CONTAINER.begin();
                 // std::cout << "My new planner 3" << std::endl;
@@ -1964,11 +1964,11 @@ int main(int argc, char *argv[])
                   it_path_helper1++;
                   // std::cout << "My new planner 12" << std::endl;
                 }
-                std::cout << "My new planner 13" << std::endl;
+                // std::cout << "My new planner 13" << std::endl;
                 currentPoint = savedPoint;
-                std::cout << "My new planner 14" << std::endl;
-                CHOSEN_PATH.push_back(savedPoint);
-                std::cout << "My new planner 15" << std::endl;
+                // std::cout << "My new planner 14" << std::endl;
+                CHOSEN_PATH.push_back(new node(savedPoint->point->x(), savedPoint->point->y(), savedPoint->point->z()));
+                // std::cout << "My new planner 15" << std::endl;
               }
               /*for(std::list<node*>::iterator it_path_helper1 = PATH_CONTAINER.begin(); it_path_helper1 != PATH_CONTAINER.end(); it_path_helper1++){ //This doesn't shorten the paths correctly, it can only attatch to a point it has direct vision of and if the path goes around a corner and comes back it will still take that route instead of cutting out the roundabout. Take the starting point and loop through the entire path, find the best shortcut, do the same for the point you shortcutted to, etc, etc.
                 if(it_path_helper1 == --PATH_CONTAINER.end()){
@@ -1995,7 +1995,7 @@ int main(int argc, char *argv[])
                 }
               }*/
               CHOSEN_PATH.push_back(new node((*retrace_path_itterator)->point->x(), (*retrace_path_itterator)->point->y(), (*retrace_path_itterator)->point->z()));
-              std::cout << "global planner 8" << std::endl;
+              // std::cout << "global planner 8" << std::endl;
               goalNode = *retrace_path_itterator;
               path_itterator = CHOSEN_PATH.begin();
               currentTarget = *path_itterator;
@@ -2005,7 +2005,7 @@ int main(int argc, char *argv[])
               std::list<node*>::iterator erase_it = myReserveGoals.end();
               retrace_path_itterator++;
               myReserveGoals.erase(retrace_path_itterator, erase_it);
-              std::cout << "global planner 9" << std::endl;
+              // std::cout << "global planner 9" << std::endl;
               break;
             }/*else{
               myReserveGoals.erase(retrace_path_itterator);
