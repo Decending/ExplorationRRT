@@ -222,7 +222,7 @@ struct node{
       bool findPathImprovement(struct node* targetNode, ufo::map::OccupancyMapColor const& map, float givenDistance, float givenRadious){
         bool improvementFound;
         // std::cout << "kommer in i findPathImprovement" << std::endl;
-        if(targetNode == this){
+        if(targetNode == this and myParent == nullptr){
           return false;
         }
         if(myParent != nullptr){
@@ -345,7 +345,7 @@ float SCALER_AABB = 20;
 float SCALER_X = SCALER_AABB;
 float SCALER_Y = SCALER_AABB;
 float SCALER_Z = SCALER_AABB;
-double radius = 1.0; // 0.5;
+double radius = 0.5; // 1.0;
 bool map_received = false;
 bool RRT_created = false;
 bool GOALS_generated = false;
@@ -384,6 +384,8 @@ int advance_index = 0;
 ufo::map::OccupancyMapColor myMap(0.4);
 std::list<struct node*> RRT_TREE{};
 std::list<struct node*> CHOSEN_PATH{};
+std::list<double> CHOSEN_PATH_VREF{};
+std::list<double>::iterator vref_itterator;
 std::list<struct node*> ALL_PATH{};
 std::list<struct node*> myGoals{};
 std::list<struct node*> myReserveGoals{};
@@ -555,7 +557,7 @@ void generateGoals(ufo::map::OccupancyMapColor const& map, bool evaluateOldGoals
         //(*it_goal)->findPathImprovement(*it_goal, myMap, DISTANCE_BETWEEN_NODES, radius);
         //std::cout << "kommer hit? 2.4 ------------------------------------------------------------" << std::endl;
         //std::cout << "Krashar efter cost calc?" << std::endl;
-        double distanceCost = (*it_goal)->sumDistance() * SCALER_DISTANCE;
+        // double distanceCost = (*it_goal)->sumDistance() * SCALER_DISTANCE;
         // std::cout << "Test 2.1" << std::endl;
         (*it_goal)->clearInformationGain();
         double informationGain = SCALER_INFORMATION_GAIN * ((*it_goal)->findInformationGain(SCALER_AABB, myMap, true));
@@ -564,7 +566,7 @@ void generateGoals(ufo::map::OccupancyMapColor const& map, bool evaluateOldGoals
         // std::cout << "Test 2.3" << std::endl;
         
         //The battleground:
-        typedef rrtCache* (*arbitrary)();
+        /*typedef rrtCache* (*arbitrary)();
         typedef rrtSolverStatus (*arbitrary2)(void*, double*, double*, double, double*);
         typedef void (*rrt_clearer)(rrtCache*);
         int i = 0;
@@ -610,13 +612,6 @@ void generateGoals(ufo::map::OccupancyMapColor const& map, bool evaluateOldGoals
         }
         // std::cout << "print 5" << std::endl;
         p[158] = 0.5;
-        
-        /*std::cout << "This is path: " << std::endl;
-        for(i = 0; i < 51; i++){
-          std::cout << p[8*i] << ", " << p[8*i + 1] << ", " << p[8*i + 2] << std::endl;
-        }
-        std::cout << "This is goal: " << std::endl;
-        std::cout << (*it_goal)->point->x() << ", " << (*it_goal)->point->y() << ", " << (*it_goal)->point->z() << std::endl;*/
   
         double u[150] = {0};
 
@@ -655,12 +650,12 @@ void generateGoals(ufo::map::OccupancyMapColor const& map, bool evaluateOldGoals
         std::tuple<std::list<double>, double, std::list<double>> trajectory(std::list<double> x, double* u, double N, double dt, std::list<double> nmpc_ref);
         std::tie(x_hist, cost, p_hist) = trajectory(x0, u, 50, 0.5, xref);
         xref.clear();
-        rrt_free(cache);
+        rrt_free(cache);*/
         // std::cout << "This is cost: " << cost << std::endl;
         // std::cout << "This is distance cost: " << distanceCost << std::endl;
-        // std::cout << "This is informationGain: " << informationGain << std::endl; */
+        // std::cout << "This is informationGain: " << informationGain << std::endl;
         // newCost = distanceCost + 0.2 * cost - informationGain;
-        newCost = distanceCost - informationGain;
+        newCost = -informationGain;
         if(informationGain > initialGoalInfo){
           initialGoalInfo = informationGain;
         }
@@ -828,6 +823,7 @@ void setPath(){
         // std::cout << "Test 2.3" << std::endl;
         
         //The battleground:
+        auto test_start_rrt2 = high_resolution_clock::now();
         typedef rrtCache* (*arbitrary)();
         typedef rrtSolverStatus (*arbitrary2)(void*, double*, double*, double, double*);
         typedef void (*rrt_clearer)(rrtCache*);
@@ -907,9 +903,11 @@ void setPath(){
         rrt_clearer rrt_free;
         *(void **) (&rrt_free) = dlsym(handle, "rrt_free");
         // std::cout << rrt_free << std::endl;
+        //std::cout << init_penalty << std::endl;
+        
         std::cout << init_penalty << std::endl;
         rrtSolverStatus status = rrt_solve(cache, u, p, 0, &init_penalty);
-        
+  
         std::list<double> uold = {9.81,0.0,0.0};
         std::list<double> uref = {9.81,0.0,0.0};
         
@@ -920,6 +918,9 @@ void setPath(){
         std::tie(x_hist, cost, p_hist) = trajectory(x0, u, 50, 0.5, xref);
         xref.clear();
         rrt_free(cache);
+        auto test_stop_rrt2 = high_resolution_clock::now();
+        auto test_duration_rrt2 = duration_cast<microseconds>(test_stop_rrt2 - test_start_rrt2);
+        std::cout << "This is the rrt_solve time: " << test_duration_rrt2.count() << std::endl;
         // std::cout << "This is cost: " << cost << std::endl;
         // std::cout << "This is distance cost: " << distanceCost << std::endl;
         // std::cout << "This is informationGain: " << informationGain << std::endl; */
@@ -966,6 +967,11 @@ void setPath(){
             // std::cout << "This is point: " << x << ", " << y << ", " << z << std::endl;
             path_itterator_helper++;
           }
+          CHOSEN_PATH_VREF.clear();
+          for(std::list<double>::iterator reference_itterator_helper = x_hist.begin(); reference_itterator_helper != x_hist.end(); reference_itterator_helper++){
+            CHOSEN_PATH_VREF.push_back(*reference_itterator_helper);
+          }
+          vref_itterator = CHOSEN_PATH_VREF.begin();
           // std::cout << p_hist << std::endl;
           // initialGoalInfo = goalNode->myHits.size();
         }
@@ -1328,7 +1334,7 @@ int main(int argc, char *argv[])
   ros::Publisher chosen_path_visualization_pub = nh.advertise<visualization_msgs::Marker>("CHOSEN_RRT_PATH_VISUALIZATION", 1);
   // ros::Publisher chosen_path_pub = nh.advertise<nav_msgs::Path>("CHOSEN_RRT_PATH", 1);
   //ros::Publisher chosen_path_pub = nh.advertise<geometry_msgs::PoseStamped>("/shafter3d/reference", 1);
-  ros::Publisher chosen_path_pub = nh.advertise<geometry_msgs::PoseStamped>("/pelican/reference", 1);
+  ros::Publisher chosen_path_pub = nh.advertise<nav_msgs::Odometry>("/pelican/reference", 1);
   ros::Publisher all_path_pub = nh.advertise<visualization_msgs::Marker>("RRT_PATHS", 1);
   ros::Publisher goal_pub = nh.advertise<visualization_msgs::Marker>("RRT_GOALS", 1);
   ros::Publisher map_pub = nh.advertise<ufomap_msgs::UFOMapStamped>("goe_map", 11);
@@ -1342,6 +1348,7 @@ int main(int argc, char *argv[])
   
   // C++ bindings battlefield
   /* parameters             */
+  high_resolution_clock::time_point test_start1 = high_resolution_clock::now();
   int i;
   double p[159] = {0};
   // Current position
@@ -1395,7 +1402,15 @@ int main(int argc, char *argv[])
   *(void **) (&rrt_free) = dlsym(handle, "rrt_free");
   // std::cout << rrt_free << std::endl;
   std::cout << init_penalty << std::endl;
+  auto test_stop1 = high_resolution_clock::now();
+  auto test_duration1 = duration_cast<microseconds>(test_stop1 - test_start1);
+  std::cout << "This is the time it took to set up variables: " << test_duration1.count() << std::endl;
+  auto test_start_rrt = high_resolution_clock::now();
+  std::cout << init_penalty << std::endl;
   rrtSolverStatus status = rrt_solve(cache, u, p, 0, &init_penalty);
+  auto test_stop_rrt = high_resolution_clock::now();
+  auto test_duration_rrt = duration_cast<microseconds>(test_stop_rrt - test_start_rrt);
+  std::cout << "This is the time it took to use rrt_solve: " << test_duration_rrt.count() << std::endl;
   // std::cout << "This is good 2: " << p[8] << std::endl;
   // std::cout << "This is good 2: " << u[0] << std::endl;
   printf("\n\n-------------------------------------------------\n");
@@ -1428,6 +1443,7 @@ int main(int argc, char *argv[])
   rrt_free(cache);
   
   // Trajectory battleground:
+  high_resolution_clock::time_point test_start2 = high_resolution_clock::now();
   double N = 50;
   double dt = 0.5;
   std::list<double> x0 = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
@@ -1445,7 +1461,22 @@ int main(int argc, char *argv[])
   std::list<double> p_hist;
   double cost;
   // std::cout << "trajectory time" << std::endl;
-  std::tie(p_hist, cost, x_hist) = trajectory(x0, u, N, dt, xref);
+  high_resolution_clock::time_point test_stop2 = high_resolution_clock::now();
+  auto test_duration2 = duration_cast<microseconds>(test_stop2 - test_start2);
+  std::cout << "This is the time it takes to set up variables 2: " << test_duration2.count() << std::endl;
+  high_resolution_clock::time_point test_start_trajectory = high_resolution_clock::now();
+  std::tie(x_hist, cost, p_hist) = trajectory(x0, u, N, dt, xref);
+  high_resolution_clock::time_point test_stop_trajectory = high_resolution_clock::now();
+  auto duration_trajectory = duration_cast<microseconds>(test_stop_trajectory - test_start_trajectory);
+  std::cout << "This is the time to do trajectory: " << duration_trajectory.count() << std::endl;
+  
+  for(std::list<double>::iterator path_itterator_helper = p_hist.begin(); path_itterator_helper != p_hist.end(); path_itterator_helper++){
+    std::cout << *path_itterator_helper << std::endl;
+  }
+  for(std::list<double>::iterator path_itterator_helper = x_hist.begin(); path_itterator_helper != x_hist.end(); path_itterator_helper++){
+    std::cout << *path_itterator_helper << std::endl;
+  }
+  
   // std::cout << "trajectory time finished" << std::endl;
   /*std::cout << "p_hist " << cost << std::endl;
   
@@ -1812,18 +1843,32 @@ int main(int argc, char *argv[])
         // std::cout << "Kommer hit? slut.0.slut" << std::endl;
         if(path_itterator != CHOSEN_PATH.end()){
           // std::cout << "kommer hit? slut.1" << std::endl;
-          geometry_msgs::PoseStamped nextPoint;
+          // geometry_msgs::PoseStamped nextPoint;
+          nav_msgs::Odometry nextPoint;
           // std::cout << "kommer hit? slut.1.1" << std::endl;
-          nextPoint.pose.position.x = (currentTarget)->point->x();
+          // nextPoint.pose.position.x = (currentTarget)->point->x();
+          nextPoint.pose.pose.position.x = (currentTarget)->point->x();
           // std::cout << "kommer hit? slut.1.2" << std::endl;
-          nextPoint.pose.position.y = (currentTarget)->point->y();
+          // nextPoint.pose.position.y = (currentTarget)->point->y();
+          nextPoint.pose.pose.position.y = (currentTarget)->point->y();
           // std::cout << "kommer hit? slut.3" << std::endl;
-          nextPoint.pose.position.z = (currentTarget)->point->z();
+          // nextPoint.pose.position.z = (currentTarget)->point->z();
+          nextPoint.pose.pose.position.z = (currentTarget)->point->z();
           // std::cout << "kommer hit? slut.4" << std::endl;
-          nextPoint.pose.orientation.x = 0;
-          nextPoint.pose.orientation.y = 0;
-          nextPoint.pose.orientation.z = 0;
-          nextPoint.pose.orientation.w = 0;
+          nextPoint.twist.twist.linear.x = *vref_itterator;
+          vref_itterator++;
+          nextPoint.twist.twist.linear.y = *vref_itterator;
+          vref_itterator++;
+          nextPoint.twist.twist.linear.z = *vref_itterator;
+          vref_itterator++;
+          // nextPoint.pose.orientation.x = 0;
+          nextPoint.pose.pose.orientation.x = 0;
+          // nextPoint.pose.orientation.y = 0;
+          nextPoint.pose.pose.orientation.y = 0;
+          // nextPoint.pose.orientation.z = 0;
+          nextPoint.pose.pose.orientation.z = 0;
+          // nextPoint.pose.orientation.w = 0;
+          nextPoint.pose.pose.orientation.w = 0;
           nextPoint.header.stamp = ros::Time::now();
           nextPoint.header.frame_id = "world";
           chosen_path_pub.publish(nextPoint);
@@ -1919,6 +1964,7 @@ int main(int argc, char *argv[])
               //std::cout << "Deleting done" << std::endl;
               // std::cout << "global planner 3" << std::endl;
               CHOSEN_PATH.clear();
+              CHOSEN_PATH_VREF.clear();
             }
             // std::cout << "global planner 4" << std::endl;
             (*retrace_path_itterator)->clearInformationGain();
