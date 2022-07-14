@@ -223,7 +223,7 @@ struct node{
         bool improvementFound;
         // std::cout << "kommer in i findPathImprovement" << std::endl;
         if(targetNode == this and myParent == nullptr){
-          return false;
+          return true;
         }
         if(myParent != nullptr){
           //std::cout << "kommer hit? 2.3.1" << std::endl;
@@ -299,7 +299,7 @@ struct node{
             //std::cout << "kommer hit? 2.3.5" << std::endl;
             targetNode->addParent(this);
             improvementFound = findPathImprovement(this, map, givenDistance, givenRadious);
-            return improvementFound;
+            return true;
           }else{
             return false;
           }
@@ -332,13 +332,13 @@ struct node{
 int NUMBER_OF_NODES = 3000;
 int NUMBER_OF_GOALS = 40;
 int NUMBER_OF_ITTERATIONS = 3000;
-float DISTANCE_BETWEEN_NODES = 0.5; // 1.0;
+float DISTANCE_BETWEEN_NODES = 0.3; // 1.0;
 float DISTANCE_BETWEEN_GOALS = 0.4;
 float MINIMUM_DISTANCE_TO_GOAL = 0.5;
 bool RUN_BY_NODES = true;
 double SENSOR_RANGE = 2;
-double SCALER_INFORMATION_GAIN = 0.1;
-double SCALER_DISTANCE = 4;
+double SCALER_INFORMATION_GAIN = 4.0;
+double SCALER_DISTANCE = 2	;
 int itterations;
 int STEP_LENGTH = 1;
 float SCALER_AABB = 20;
@@ -701,7 +701,7 @@ void generateGoals(ufo::map::OccupancyMapColor const& map, bool evaluateOldGoals
   }
   if(goalNode != nullptr){
     // std::cout << "Goalnode is not nullptr!" << std::endl;
-    if(sqrt(pow(position_x - goalNode->point->x(), 2) + pow(position_y - goalNode->point->y(), 2) + pow(position_z - goalNode->point->z(), 2)) > 0.5){
+    if(sqrt(pow(position_x - goalNode->point->x(), 2) + pow(position_y - goalNode->point->y(), 2) + pow(position_z - goalNode->point->z(), 2)) > 0.7){
       std::list<node*>::iterator it_goal2;
       // std::cout << "this is my goal size: " << myGoals.size() << std::endl;
       int help_counter = 0;
@@ -790,7 +790,7 @@ void setPath(){
   bool setDistance = false;
   if(goalNode != nullptr){
     goalNode->clearInformationGain();
-    if(sqrt(pow(position_x - goalNode->point->x(), 2) + pow(position_y - goalNode->point->y(), 2) + pow(position_z - goalNode->point->z(), 2)) < 0.5){
+    if((sqrt(pow(position_x - goalNode->point->x(), 2) + pow(position_y - goalNode->point->y(), 2) + pow(position_z - goalNode->point->z(), 2)) < 0.5)){
       allowNewPath = true;
       totalCost = std::numeric_limits<float>::max();
     }else{
@@ -807,6 +807,9 @@ void setPath(){
       //std::cout << "kommer hit? 2.1" << std::endl;
       if((*it_goal)->myParent != nullptr){
         // std::cout << "Test 1" << std::endl;
+        linSpace(*it_goal, DISTANCE_BETWEEN_NODES);
+        (*it_goal)->findPathImprovement(*it_goal, myMap, DISTANCE_BETWEEN_NODES, radius);
+        linSpace(*it_goal, DISTANCE_BETWEEN_NODES);
         (*it_goal)->findPathImprovement(*it_goal, myMap, DISTANCE_BETWEEN_NODES, radius);
         // std::cout << "Test 2" << std::endl;
         //std::cout << "kommer hit? 2.2 ------------------------------------------------------------" << std::endl;
@@ -817,7 +820,7 @@ void setPath(){
         //std::cout << "Krashar efter cost calc?" << std::endl;
         double distanceCost = (*it_goal)->sumDistance() * SCALER_DISTANCE;
         // std::cout << "Test 2.1" << std::endl;
-        double informationGain = SCALER_INFORMATION_GAIN * ((*it_goal)->findInformationGain(SCALER_AABB, myMap, false));
+        double informationGain = SCALER_INFORMATION_GAIN * log((*it_goal)->findInformationGain(SCALER_AABB, myMap, false));
         // std::cout << "Test 2.2" << std::endl;
         linSpace(*it_goal, DISTANCE_BETWEEN_NODES);
         // std::cout << "Test 2.3" << std::endl;
@@ -869,7 +872,7 @@ void setPath(){
           }
         }
         // std::cout << "print 5" << std::endl;
-        p[158] = 0.5;
+        p[158] = 0.3;
         
         /*std::cout << "This is path: " << std::endl;
         for(i = 0; i < 51; i++){
@@ -915,17 +918,20 @@ void setPath(){
         std::list<double> p_hist;
         double cost;
         std::tuple<std::list<double>, double, std::list<double>> trajectory(std::list<double> x, double* u, double N, double dt, std::list<double> nmpc_ref);
-        std::tie(x_hist, cost, p_hist) = trajectory(x0, u, 50, 0.5, xref);
+        std::tie(x_hist, cost, p_hist) = trajectory(x0, u, 50, 0.3, xref);
         xref.clear();
         rrt_free(cache);
         auto test_stop_rrt2 = high_resolution_clock::now();
         auto test_duration_rrt2 = duration_cast<microseconds>(test_stop_rrt2 - test_start_rrt2);
         std::cout << "This is the rrt_solve time: " << test_duration_rrt2.count() << std::endl;
+        /*for(std::list<double>::iterator path_itterator_helper = p_hist.begin(); path_itterator_helper != p_hist.end(); path_itterator_helper++){
+          std::cout << *path_itterator_helper << std::endl;
+        }*/
         // std::cout << "This is cost: " << cost << std::endl;
         // std::cout << "This is distance cost: " << distanceCost << std::endl;
         // std::cout << "This is informationGain: " << informationGain << std::endl; */
         // newCost = distanceCost + 0.2 * cost - informationGain;
-        newCost = distanceCost - informationGain;
+        newCost = distanceCost - informationGain; // + 0.05 * cost;
         if(informationGain > initialGoalInfo){
           initialGoalInfo = informationGain;
         }
@@ -998,7 +1004,7 @@ void setPath(){
     CHOSEN_PATH.clear();
     if(goalNode != nullptr and newPath){
       averageInfoCounter++;
-      averageInfo = 100; //averageInfo + (goalNode->myHits.size() - averageInfo)/averageInfoCounter;
+      // averageInfo = 100; //averageInfo + (goalNode->myHits.size() - averageInfo)/averageInfoCounter;
       setDistance = true;
       //linSpace(goalNode, DISTANCE_BETWEEN_NODES);
       //std::cout << "Test 5" << std::endl;
@@ -1169,10 +1175,10 @@ std::tuple<std::list<double>, double, std::list<double>> trajectory(std::list<do
     std::list<double> v_traj{};
     double cost = 0;
     // Weight matrices
-    std::list<double> Qx = {5,5,5, 0, 0,0, 5, 5};
+    std::list<double> Qx = {30,30,30, 2, 2,2, 4, 4};
     // P = 2*Qx; #final state weight
-    std::list<double> Ru = {15,15,15}; // input weights
-    std::list<double> Rd = {10, 10, 10}; // input rate weights
+    std::list<double> Ru = {2, 2, 2}; // input weights
+    std::list<double> Rd = {2, 2, 2}; // input rate weights
     // print(x, u, N, dt)
     std::list<double> u_old = {9.81,0.0,0.0};
     std::list<double> u_ref = {9.81,0.0,0.0};
@@ -1240,19 +1246,19 @@ std::tuple<std::list<double>, double, std::list<double>> trajectory(std::list<do
       }
       std::list<double>::iterator x3_itterator = x.begin();
       std::advance(x3_itterator, 7); // x[7]
-      *x_itterator = *x_itterator + dt * (sin(*x3_itterator) * cos(*x2_itterator) * u[3*i] - 0.5 * (*x_itterator));
+      *x_itterator = *x_itterator + dt * (sin(*x3_itterator) * cos(*x2_itterator) * u[3*i] - 1 * (*x_itterator));
       // std::cout << "THIS IS IMPORTANT: " << *x_itterator << std::endl;
       x_itterator++; // x[4]
-      *x_itterator = *x_itterator + dt * (-sin(*x2_itterator) * u[3*i] - 0.5 * (*x_itterator));
+      *x_itterator = *x_itterator + dt * (-sin(*x2_itterator) * u[3*i] - 1 * (*x_itterator));
       x_itterator++; // x[5]
       // std::cout << "THIS IS IMPORTANT: "<< *x_itterator << ", " << *x3_itterator << ", " << *x2_itterator << ", " << u[3*i] << std::endl;
-      *x_itterator = *x_itterator + dt * (cos(*x3_itterator) * cos(*x2_itterator) * u[3*i] - 0.5 * *x_itterator - 9.81);
+      *x_itterator = *x_itterator + dt * (cos(*x3_itterator) * cos(*x2_itterator) * u[3*i] - 1 * *x_itterator - 9.81);
       x_itterator++;
       //u_n_itterator++;
-      *x_itterator = *x_itterator + dt * ((1.0 / 0.8) * (u[3*i + 1] - *x_itterator));
+      *x_itterator = *x_itterator + dt * ((1.0 / 0.5) * (u[3*i + 1] - *x_itterator));
       x_itterator++;
       //u_n_itterator++;
-      *x_itterator = *x_itterator + dt * ((1.0 / 0.8) * (u[3*i + 2] - *x_itterator));
+      *x_itterator = *x_itterator + dt * ((1.0 / 0.5) * (u[3*i + 2] - *x_itterator));
       /*
       p_hist = p_hist + [[x[0],x[1],x[2]]];*/
       x_itterator = x.begin();
@@ -1333,14 +1339,14 @@ int main(int argc, char *argv[])
   ros::Publisher points_pub = nh.advertise<visualization_msgs::Marker>("RRT_NODES", 1);
   ros::Publisher chosen_path_visualization_pub = nh.advertise<visualization_msgs::Marker>("CHOSEN_RRT_PATH_VISUALIZATION", 1);
   // ros::Publisher chosen_path_pub = nh.advertise<nav_msgs::Path>("CHOSEN_RRT_PATH", 1);
-  //ros::Publisher chosen_path_pub = nh.advertise<geometry_msgs::PoseStamped>("/shafter3d/reference", 1);
+  // ros::Publisher chosen_path_pub = nh.advertise<geometry_msgs::PoseStamped>("/shafter3d/reference", 1);
   ros::Publisher chosen_path_pub = nh.advertise<nav_msgs::Odometry>("/pelican/reference", 1);
   ros::Publisher all_path_pub = nh.advertise<visualization_msgs::Marker>("RRT_PATHS", 1);
   ros::Publisher goal_pub = nh.advertise<visualization_msgs::Marker>("RRT_GOALS", 1);
   ros::Publisher map_pub = nh.advertise<ufomap_msgs::UFOMapStamped>("goe_map", 11);
   ros::Subscriber map_sub = nh.subscribe("ufomap_mapping_server_node/map_depth_3", 1, mapCallback);
   ros::Subscriber sub = nh.subscribe("/pelican/ground_truth/odometry", 1, odomCallback);
-  //ros::Subscriber sub = nh.subscribe("/odometry/imu", 1, odomCallback);
+  // ros::Subscriber sub = nh.subscribe("/odometry/imu", 1, odomCallback);
   ros::Publisher hits_pub = nh.advertise<visualization_msgs::Marker>("HITS", 1);
   ros::Publisher position_pub = nh.advertise<visualization_msgs::Marker>("POSITION", 1);
   ros::Publisher taken_path_pub = nh.advertise<visualization_msgs::Marker>("PATH_TAKEN", 1);
@@ -1478,9 +1484,9 @@ int main(int argc, char *argv[])
   }
   
   // std::cout << "trajectory time finished" << std::endl;
-  /*std::cout << "p_hist " << cost << std::endl;
+  // std::cout << "p_hist " << cost << std::endl;
   
-  for(std::list<float>::iterator path_itterator_helper = p_hist.begin(); path_itterator_helper != p_hist.end(); path_itterator_helper++){
+  /*for(std::list<float>::iterator path_itterator_helper = p_hist.begin(); path_itterator_helper != p_hist.end(); path_itterator_helper++){
     std::cout << *path_itterator_helper << std::endl;
   }
   
@@ -1501,6 +1507,9 @@ int main(int argc, char *argv[])
   
   //auto duration = duration_cast<microseconds>(stop - start);
   //cout << "\nExecution time: " << duration.count() << " micro seconds for " << NUMBER_OF_NODES << " itterations." << endl;
+  /*while(true){
+  
+  }*/
   while(ros::ok()){
     high_resolution_clock::time_point start_total = high_resolution_clock::now();
     //high_resolution_clock::time_point stop_total;
@@ -1803,14 +1812,14 @@ int main(int argc, char *argv[])
       if(fetched_path and goalNode != nullptr){  
         itterations++;
         // std::cout << "kommer hit? 715" << std::endl;
-        if(sqrt(pow(position_x - goalNode->point->x(), 2) + pow(position_y - goalNode->point->y(), 2) + pow(position_z - goalNode->point->z(), 2)) < 0.5){
+        if((sqrt(pow(position_x - goalNode->point->x(), 2) + pow(position_y - goalNode->point->y(), 2) + pow(position_z - goalNode->point->z(), 2)) < 0.7)){
           // std::cout << "kommer hit? 716" << std::endl;
           itterations = 0;
           fetched_path = false;
           RRT_created = false;
           GOALS_generated = false;
           position_received = false;
-          //allowNewPath = true;
+          // allowNewPath = true;
           /*if(recoveryUnderway){
             for(std::list<node*>::iterator erase_reserveGoal_it = myReserveGoals.end(); erase_reserveGoal_it != myReserveGoals.begin(); erase_reserveGoal_it--){
               if(*erase_reserveGoal_it == goalNode){
@@ -1824,6 +1833,8 @@ int main(int argc, char *argv[])
           }*/
         }
         // std::cout << "Kommer hit? slut.0" << std::endl;
+        // std::cout << "This is test print" << currentTarget->point->x() << std::endl;
+        // std::cout << "Kommer hit? slut.0.believe" << std::endl;
         if((sqrt(pow(position_x - currentTarget->point->x(), 2) + pow(position_y - currentTarget->point->y(), 2) + pow(position_z - currentTarget->point->z(), 2)) < 0.5) and path_itterator != --CHOSEN_PATH.end()){
           // std::cout << "Kommer hit? slut.0.1" << std::endl;
           //path_itterator++;
@@ -1831,6 +1842,8 @@ int main(int argc, char *argv[])
           path_itterator = CHOSEN_PATH.begin();
           std::advance(path_itterator, advance_index);
           currentTarget = *path_itterator;
+          // std::cout << "This is current target print" << std::endl;
+          // std::cout << currentTarget->point->x() << std::endl;
           // std::cout << "Kommer hit? slut.0.2" << std::endl;
           if(path_itterator == CHOSEN_PATH.end()){
             path_itterator--;
@@ -1841,6 +1854,8 @@ int main(int argc, char *argv[])
           // std::cout << "Kommer hit? slut.0.3" << std::endl;
         }
         // std::cout << "Kommer hit? slut.0.slut" << std::endl;
+        // std::cout << currentTarget->point->x() << std::endl;
+        // std::cout << "passed" << std::endl;
         if(path_itterator != CHOSEN_PATH.end()){
           // std::cout << "kommer hit? slut.1" << std::endl;
           // geometry_msgs::PoseStamped nextPoint;
@@ -1855,12 +1870,18 @@ int main(int argc, char *argv[])
           // nextPoint.pose.position.z = (currentTarget)->point->z();
           nextPoint.pose.pose.position.z = (currentTarget)->point->z();
           // std::cout << "kommer hit? slut.4" << std::endl;
-          nextPoint.twist.twist.linear.x = *vref_itterator;
-          vref_itterator++;
-          nextPoint.twist.twist.linear.y = *vref_itterator;
-          vref_itterator++;
-          nextPoint.twist.twist.linear.z = *vref_itterator;
-          vref_itterator++;
+          if(!recoveryUnderway){
+            nextPoint.twist.twist.linear.x = *vref_itterator;
+            vref_itterator++;
+            nextPoint.twist.twist.linear.y = *vref_itterator;
+            vref_itterator++;
+            nextPoint.twist.twist.linear.z = *vref_itterator;
+            vref_itterator++;
+          }else{
+            nextPoint.twist.twist.linear.x = 0;
+            nextPoint.twist.twist.linear.y = 0;
+            nextPoint.twist.twist.linear.z = 0;
+          }
           // nextPoint.pose.orientation.x = 0;
           nextPoint.pose.pose.orientation.x = 0;
           // nextPoint.pose.orientation.y = 0;
@@ -1928,12 +1949,13 @@ int main(int argc, char *argv[])
       }*/
       // std::cout << advance_index << std::endl;
       // std::cout << fetched_path << std::endl;
-      if((goalNode != nullptr or (goalNode == nullptr and GOALS_generated)) or averageInfoCounter > 2){
+      if((goalNode != nullptr or (goalNode == nullptr and GOALS_generated))){// or averageInfoCounter > 2){
         // std::cout << "This is my found infoGain for the chosen path: " << goalNode->myHits.size() << std::endl;
         std::cout << "This is my average infoGain: " << averageInfo << std::endl;
         std::cout << "This is my infoGain counter: " << averageInfoCounter << std::endl;
         std::cout << "This is my goalNodes infogain: " << initialGoalInfo << std::endl;
         if(initialGoalInfo < (0.2 * averageInfo) and averageInfoCounter > 5 and not recoveryUnderway){
+          tuneGeneration(myMap, false, true, false, position_x, position_y, position_z, 3);
           for(int i = 0; i < 3; i++){
             generateGoals(myMap, false);
             generateRRT(position_x, position_y, position_z);
@@ -1991,7 +2013,7 @@ int main(int argc, char *argv[])
                 // std::cout << "My new planner 2" << std::endl;
                 std::list<node*>::iterator it_path_helper1 = PATH_CONTAINER.begin();
                 // std::cout << "My new planner 3" << std::endl;
-                std::advance(it_path_helper1, advance_index);
+                std::advance(it_path_helper1, mySavedIndex);
                 // std::cout << "My new planner 4" << std::endl;
                 while(it_path_helper1 != PATH_CONTAINER.end()){
                   // std::cout << "My new planner 5" << std::endl;
