@@ -12,10 +12,11 @@ find_package(catkin REQUIRED COMPONENTS
   ufomap_msgs
   ufomap_ros
   tf2_ros
+  roslib
 )
 find_package(ufomap REQUIRED)
 
-include_directories(${catkin_INCLUDE_DIRS})
+include_directories(${catkin_INCLUDE_DIRS} MAV MAV/rrt/target/release) 
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -156,6 +157,7 @@ add_executable(Tutorial_create_map_colour_node tutorial_create_map_colour.cpp)
 # )
 target_link_libraries(Tutorial_create_map_colour_node
   ${catkin_LIBRARIES}
+  ${CMAKE_DL_LIBS}
 )
 target_link_libraries(Tutorial_create_map_colour_node UFO::Map)
 
@@ -214,16 +216,16 @@ target_link_libraries(Tutorial_create_map_colour_node UFO::Map)
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
 
-add_executable(optimizer ${CMAKE_SOURCE_DIR}/MAV/rrt/example_optimizer.c)
+add_executable(rrt ${CMAKE_SOURCE_DIR}/MAV/rrt/example_optimizer.c)
 
 # Add libraries to the executable
-target_link_libraries(optimizer ${CMAKE_SOURCE_DIR}/MAV/rrt/target/release/librrt.a)
-target_link_libraries(optimizer m)
-target_link_libraries(optimizer dl)
-target_link_libraries(optimizer pthread)
+target_link_libraries(rrt ${CMAKE_SOURCE_DIR}/MAV/rrt/target/release/librrt.a)
+target_link_libraries(rrt m)
+target_link_libraries(rrt dl)
+target_link_libraries(rrt pthread)
 
 add_custom_target(run
-    COMMAND optimizer
-    DEPENDS optimizer
+    COMMAND rrt
+    DEPENDS rrt
     WORKING_DIRECTORY ${CMAKE_PROJECT_DIR}
 )

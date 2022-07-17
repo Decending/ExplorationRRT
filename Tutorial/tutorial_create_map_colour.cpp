@@ -13,12 +13,13 @@
 #include <visualization_msgs/Marker.h>
 #include <geometry_msgs/PoseStamped.h>
 #include <nav_msgs/Path.h>
-#include "nav_msgs/Odometry.h"
+#include <nav_msgs/Odometry.h>
 #include <math.h>
-#include "MAV/rrt/rrt_bindings.h"
+#include <rrt/rrt_bindings.h>
 #include <dlfcn.h>
 #include <stdlib.h>
 #include <tf/tf.h>
+#include <ros/package.h>
 
 using namespace std::chrono;
 using namespace std;
@@ -891,7 +892,7 @@ void setPath(){
         }
 
         double init_penalty = 0;
-        void *handle = dlopen("./MAV/rrt/target/release/librrt.so", RTLD_LAZY);
+        void *handle = dlopen((ros::package::getPath("tutorials")  + "/MAV/rrt/target/release/librrt.so").c_str(), RTLD_LAZY);
         if (!handle) {
           fprintf(stderr, "%s\n", dlerror());
           exit(EXIT_FAILURE);
@@ -1194,17 +1195,6 @@ std::tuple<std::list<double>, double, std::list<double>> trajectory(std::list<do
       std::list<double>::iterator x_ref_itterator = nmpc_ref.begin();
       // std::advance(x_ref_itterator, i*ns);
       
-      for(int j = 0; j < 8; j++){
-        // std::cout << (*Qx_itterator) << ", " <<  (*x_itterator) << ", " << (*x_ref_itterator) << std::endl;
-        if(i < 3){
-          cost = cost + (*Qx_itterator) * pow((*x_itterator) - (*x_ref_itterator), 2);
-        }else{
-          cost = cost + (*Qx_itterator) * pow((*x_itterator), 2);
-        }
-        Qx_itterator++;
-        x_itterator++;
-        x_ref_itterator++;
-      }
       //std::cout << "\n" << std::endl;
       //std::cout << "this is cost: " << cost << std::endl;
       //cost = cost + pow((*Qx_itterator) * (*x_itterator - *x_ref_itterator), 2) + Qx[1]*(x[1]-x_ref[i + 1])**2 + Qx[2]*(x[2]-x_ref[i + 2])**2 + Qx[3]*(x[3]-x_ref[i + 3])**2 + Qx[4]*(x[4]-x_ref[i + 4])**2 + Qx[5]*(x[5]-x_ref[i + 5])**2 + Qx[6]*(x[6]-x_ref[i + 6])**2 + Qx[7]*(x[7]-x_ref[i + 7])**2;  // State weights
@@ -1261,6 +1251,18 @@ std::tuple<std::list<double>, double, std::list<double>> trajectory(std::list<do
       *x_itterator = *x_itterator + dt * ((1.0 / 0.5) * (u[3*i + 2] - *x_itterator));
       /*
       p_hist = p_hist + [[x[0],x[1],x[2]]];*/
+      for(int j = 0; j < 8; j++){
+        // std::cout << (*Qx_itterator) << ", " <<  (*x_itterator) << ", " << (*x_ref_itterator) << std::endl;
+        if(i < 3){
+          cost = cost + (*Qx_itterator) * pow((*x_itterator) - (*x_ref_itterator), 2);
+        }else{
+          cost = cost + (*Qx_itterator) * pow((*x_itterator), 2);
+        }
+        Qx_itterator++;
+        x_itterator++;
+        x_ref_itterator++;
+      }
+      
       x_itterator = x.begin();
       p_traj.push_back(*x_itterator);
       x_itterator++;
@@ -1339,14 +1341,14 @@ int main(int argc, char *argv[])
   ros::Publisher points_pub = nh.advertise<visualization_msgs::Marker>("RRT_NODES", 1);
   ros::Publisher chosen_path_visualization_pub = nh.advertise<visualization_msgs::Marker>("CHOSEN_RRT_PATH_VISUALIZATION", 1);
   // ros::Publisher chosen_path_pub = nh.advertise<nav_msgs::Path>("CHOSEN_RRT_PATH", 1);
-  // ros::Publisher chosen_path_pub = nh.advertise<geometry_msgs::PoseStamped>("/shafter3d/reference", 1);
-  ros::Publisher chosen_path_pub = nh.advertise<nav_msgs::Odometry>("/pelican/reference", 1);
+  ros::Publisher chosen_path_pub = nh.advertise<geometry_msgs::PoseStamped>("/shafter3d/reference", 1);
+  // ros::Publisher chosen_path_pub = nh.advertise<nav_msgs::Odometry>("/pelican/reference", 1);
   ros::Publisher all_path_pub = nh.advertise<visualization_msgs::Marker>("RRT_PATHS", 1);
   ros::Publisher goal_pub = nh.advertise<visualization_msgs::Marker>("RRT_GOALS", 1);
   ros::Publisher map_pub = nh.advertise<ufomap_msgs::UFOMapStamped>("goe_map", 11);
   ros::Subscriber map_sub = nh.subscribe("ufomap_mapping_server_node/map_depth_3", 1, mapCallback);
-  ros::Subscriber sub = nh.subscribe("/pelican/ground_truth/odometry", 1, odomCallback);
-  // ros::Subscriber sub = nh.subscribe("/odometry/imu", 1, odomCallback);
+  // ros::Subscriber sub = nh.subscribe("/pelican/ground_truth/odometry", 1, odomCallback);
+  ros::Subscriber sub = nh.subscribe("/odometry/imu", 1, odomCallback);
   ros::Publisher hits_pub = nh.advertise<visualization_msgs::Marker>("HITS", 1);
   ros::Publisher position_pub = nh.advertise<visualization_msgs::Marker>("POSITION", 1);
   ros::Publisher taken_path_pub = nh.advertise<visualization_msgs::Marker>("PATH_TAKEN", 1);
@@ -1392,7 +1394,7 @@ int main(int argc, char *argv[])
 
   /* initial penalty        */
   double init_penalty = 1.0;
-  void *handle = dlopen("./MAV/rrt/target/release/librrt.so", RTLD_LAZY);
+  void *handle = dlopen((ros::package::getPath("tutorials") + "/MAV/rrt/target/release/librrt.so").c_str(), RTLD_LAZY);
   if (!handle) {
     fprintf(stderr, "%s\n", dlerror());
     exit(EXIT_FAILURE);
@@ -1812,14 +1814,14 @@ int main(int argc, char *argv[])
       if(fetched_path and goalNode != nullptr){  
         itterations++;
         // std::cout << "kommer hit? 715" << std::endl;
-        if((sqrt(pow(position_x - goalNode->point->x(), 2) + pow(position_y - goalNode->point->y(), 2) + pow(position_z - goalNode->point->z(), 2)) < 0.7)){
+        if((sqrt(pow(position_x - goalNode->point->x(), 2) + pow(position_y - goalNode->point->y(), 2) + pow(position_z - goalNode->point->z(), 2)) < 0.7) or true){
           // std::cout << "kommer hit? 716" << std::endl;
           itterations = 0;
           fetched_path = false;
           RRT_created = false;
           GOALS_generated = false;
           position_received = false;
-          // allowNewPath = true;
+          allowNewPath = true;
           /*if(recoveryUnderway){
             for(std::list<node*>::iterator erase_reserveGoal_it = myReserveGoals.end(); erase_reserveGoal_it != myReserveGoals.begin(); erase_reserveGoal_it--){
               if(*erase_reserveGoal_it == goalNode){
