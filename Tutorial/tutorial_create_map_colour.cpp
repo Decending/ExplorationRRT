@@ -20,6 +20,8 @@
 #include <stdlib.h>
 #include <tf/tf.h>
 #include <ros/package.h>
+#include <dynamic_reconfigure/server.h>
+#include <tutorials/ServerConfig.h>
 
 using namespace std::chrono;
 using namespace std;
@@ -96,8 +98,8 @@ struct node{
         return;
       }
       
-      int findInformationGain(float SCALER_AABB, ufo::map::OccupancyMapColor const& map, bool excludePath){
-        if(myHits.empty()){
+      int findInformationGain(float SCALER_AABB, float givenHorizontal, float givenVertical, float givenMin, float givenMax, ufo::map::OccupancyMapColor const& map, bool excludePath, bool findAnyInfo){
+        if(myHits.empty() or findAnyInfo){
           //Setting up targets, X / Y targets in either positive (P) or negative (N) direction
           ufo::math::Vector3 targetXP(point->x() + 1, point->y(), point->z());
           ufo::math::Vector3 targetXN(point->x() - 1, point->y(), point->z());
@@ -106,12 +108,12 @@ struct node{
           ufo::math::Vector3 upwards(point->x(), point->y(), point->z() + 1);
         
           //Angles
-          double vertical_angle = 0.393;
-          double horizontal_angle = 0.785;
+          double vertical_angle = givenVertical;
+          double horizontal_angle = givenHorizontal;
         
           //Distances
-          double near_distance = 0.2;
-          double far_distance = 10;
+          double near_distance = givenMin;
+          double far_distance = givenMax;
         
           //Frustums
           ufo::geometry::Frustum frustXP(*point, targetXP, upwards, vertical_angle, horizontal_angle, near_distance, far_distance);
@@ -119,41 +121,53 @@ struct node{
           ufo::geometry::Frustum frustYP(*point, targetYP, upwards, vertical_angle, horizontal_angle, near_distance, far_distance);
           ufo::geometry::Frustum frustYN(*point, targetYN, upwards, vertical_angle, horizontal_angle, near_distance, far_distance);
           int checks = 0;
-          for (auto it = map.beginLeaves(frustXP, false, false, true, false, 3), it_end = map.endLeaves(); it != it_end; ++it){
+          for (auto it = map.beginLeaves(frustXP, false, false, true, false, 0), it_end = map.endLeaves(); it != it_end; ++it){
             ufo::math::Vector3 end_point(it.getX(), it.getY(), it.getZ());
             ufo::geometry::LineSegment myLine(*point, end_point);
             checks++;
-            if(!isInCollision(map, myLine, true, false, false, 3)){
+            if(!isInCollision(map, myLine, true, false, false, 0)){
+              if(findAnyInfo){
+                return 1;
+              }
               myHits.push_back(end_point);
             }
           }
-          for (auto it = map.beginLeaves(frustXN, false, false, true, false, 3), it_end = map.endLeaves(); it != it_end; ++it){
+          for (auto it = map.beginLeaves(frustXN, false, false, true, false, 0), it_end = map.endLeaves(); it != it_end; ++it){
             ufo::math::Vector3 end_point(it.getX(), it.getY(), it.getZ());
             ufo::geometry::LineSegment myLine(*point, end_point);
             checks++;
-            if(!isInCollision(map, myLine, true, false, false, 3)){
+            if(!isInCollision(map, myLine, true, false, false, 0)){
+              if(findAnyInfo){
+                return 1;
+              }
               myHits.push_back(end_point);
             }
           }
-          for (auto it = map.beginLeaves(frustYP, false, false, true, false, 3), it_end = map.endLeaves(); it != it_end; ++it){
+          for (auto it = map.beginLeaves(frustYP, false, false, true, false, 0), it_end = map.endLeaves(); it != it_end; ++it){
             ufo::math::Vector3 end_point(it.getX(), it.getY(), it.getZ());
             ufo::geometry::LineSegment myLine(*point, end_point);
             checks++;
-            if(!isInCollision(map, myLine, true, false, false, 3)){
+            if(!isInCollision(map, myLine, true, false, false, 0)){
+              if(findAnyInfo){
+                return 1;
+              }
               myHits.push_back(end_point);
             }
           }
-          for (auto it = map.beginLeaves(frustYN, false, false, true, false, 3), it_end = map.endLeaves(); it != it_end; ++it){
+          for (auto it = map.beginLeaves(frustYN, false, false, true, false, 0), it_end = map.endLeaves(); it != it_end; ++it){
             ufo::math::Vector3 end_point(it.getX(), it.getY(), it.getZ());
             ufo::geometry::LineSegment myLine(*point, end_point);
             checks++;
-            if(!isInCollision(map, myLine, true, false, false, 3)){
+            if(!isInCollision(map, myLine, true, false, false, 0)){
+              if(findAnyInfo){
+                return 1;
+              }
               myHits.push_back(end_point);
             }
           }
           //std::cout << "My checks: " << checks << std::endl;
           if(myParent != nullptr and not excludePath){
-            myParent->findInformationGain(SCALER_AABB, map, excludePath);
+            myParent->findInformationGain(SCALER_AABB, givenVertical, givenHorizontal, givenMin, givenMax, map, excludePath, findAnyInfo);
           }
         }else{
           std::list<ufo::math::Vector3>::iterator it_hits;	
@@ -330,23 +344,26 @@ struct node{
 };
 
 // Variables of interest
-int NUMBER_OF_NODES = 3000;
-int NUMBER_OF_GOALS = 40;
-int NUMBER_OF_ITTERATIONS = 3000;
-float DISTANCE_BETWEEN_NODES = 0.3; // 1.0;
-float DISTANCE_BETWEEN_GOALS = 0.4;
-float MINIMUM_DISTANCE_TO_GOAL = 0.5;
-bool RUN_BY_NODES = true;
-double SENSOR_RANGE = 2;
-double SCALER_INFORMATION_GAIN = 4.0;
-double SCALER_DISTANCE = 2	;
+int NUMBER_OF_NODES;
+int NUMBER_OF_GOALS;
+int NUMBER_OF_ITTERATIONS;
+float DISTANCE_BETWEEN_NODES; // 1.0;
+float DISTANCE_BETWEEN_GOALS;
+float MINIMUM_DISTANCE_TO_GOAL;
+bool RUN_BY_NODES;
+double SENSOR_RANGE;
+double SENSOR_MIN;
+double SENSOR_VERTICAL;
+double SENSOR_HORIZONTAL;
+double SCALER_INFORMATION_GAIN;
+double SCALER_DISTANCE;
+double SCALER_ACTUATION;
 int itterations;
-int STEP_LENGTH = 1;
-float SCALER_AABB = 20;
+float SCALER_AABB;
 float SCALER_X = SCALER_AABB;
 float SCALER_Y = SCALER_AABB;
 float SCALER_Z = SCALER_AABB;
-double radius = 0.5; // 1.0;
+double RADIOUS;
 bool map_received = false;
 bool RRT_created = false;
 bool GOALS_generated = false;
@@ -497,11 +514,11 @@ void findShortestPath(){
           ufo::math::Vector3 newVector((*it_goals)->point->x() - (*it_RRT)->point->x(), (*it_goals)->point->y() - (*it_RRT)->point->y(), (*it_goals)->point->z() - (*it_RRT)->point->z());
           //std::cout << "my newVector: " << newVector.x() << ", " << newVector.y() << ", " << newVector.z() << std::endl;
           float distance_calc = newVector.norm();
-          float itterations = (distance_calc / radius);
+          float itterations = (distance_calc / DISTANCE_BETWEEN_NODES);
           //std::cout << "my distance: " << distance << std::endl;
           //std::cout << "my givenDistance: " << givenDistance << std::endl;
           //std::cout << "my itterations: " << itterations << std::endl;
-          float part = radius / distance_calc;
+          float part = DISTANCE_BETWEEN_NODES / distance_calc;
           float xStep = ((*it_goals)->point->x() - (*it_RRT)->point->x()) * part;
           float yStep = ((*it_goals)->point->y() - (*it_RRT)->point->y()) * part;
           float zStep = ((*it_goals)->point->z() - (*it_RRT)->point->z()) * part;
@@ -512,7 +529,7 @@ void findShortestPath(){
           for(int i = 1; i < itterations; i++){
             //std::cout << "\nnewPoints x, y, z: " << parent->point->x() << ", " << parent->point->y() << ", " << parent->point->z() << std::endl;
             ufo::math::Vector3 newVector = ufo::math::Vector3((*it_RRT)->point->x() + i * xStep, (*it_RRT)->point->y() + i * yStep, (*it_RRT)->point->z() + i * zStep);
-            ufo::geometry::Sphere new_sphere(newVector, radius);
+            ufo::geometry::Sphere new_sphere(newVector, RADIOUS);
             if(isInCollision(myMap, new_sphere, true, false, true, 3)){
               add = false;
               break;
@@ -561,7 +578,7 @@ void generateGoals(ufo::map::OccupancyMapColor const& map, bool evaluateOldGoals
         // double distanceCost = (*it_goal)->sumDistance() * SCALER_DISTANCE;
         // std::cout << "Test 2.1" << std::endl;
         (*it_goal)->clearInformationGain();
-        double informationGain = SCALER_INFORMATION_GAIN * ((*it_goal)->findInformationGain(SCALER_AABB, myMap, true));
+        double informationGain = SCALER_INFORMATION_GAIN * ((*it_goal)->findInformationGain(SCALER_AABB, SENSOR_HORIZONTAL, SENSOR_VERTICAL, SENSOR_MIN, SENSOR_RANGE, myMap, true, false));
         // std::cout << "Test 2.2" << std::endl;
         //linSpace(*it_goal, DISTANCE_BETWEEN_NODES);
         // std::cout << "Test 2.3" << std::endl;
@@ -677,7 +694,7 @@ void generateGoals(ufo::map::OccupancyMapColor const& map, bool evaluateOldGoals
         bool infoRequirement = ((*it_goal)->myHits.size() > 0.1 * averageInfo or averageInfoCounter < 6);
         bool stickyFloor = ((stickyCounter < 0.8 * (*it_goal)->myHits.size()) or averageInfoCounter < 6);
         // std::cout << "This is requirements: " << (newCost < totalCost) << ((*it_goal)->findInformationGain(SCALER_AABB, myMap) > 0) << (stickyFloor and infoRequirement) << std::endl;
-        if((newCost < totalCost) and ((*it_goal)->findInformationGain(SCALER_AABB, myMap, false) > 0) and (stickyFloor and infoRequirement) and (*it_goal)->myParent != nullptr){
+        if((newCost < totalCost) and ((*it_goal)->findInformationGain(SCALER_AABB, SENSOR_HORIZONTAL, SENSOR_VERTICAL, SENSOR_MIN, SENSOR_RANGE, myMap, false, false) > 0) and (stickyFloor and infoRequirement) and (*it_goal)->myParent != nullptr){
           // std::cout << newCost << " < " << totalCost << ", " << (*it_goal)->sumDistance() << " < " << 0.2 * totalDistance << std::endl;
           totalCost = newCost;
           reserveGoalNode = *it_goal;
@@ -742,8 +759,9 @@ void generateGoals(ufo::map::OccupancyMapColor const& map, bool evaluateOldGoals
     float x = lowest_x + abs(1024 * rand () / (RAND_MAX + 1.0)) * SCALER_X;
     float y = lowest_y + abs(1024 * rand () / (RAND_MAX + 1.0)) * SCALER_Y;
     float z = lowest_z + abs(1024 * rand () / (RAND_MAX + 1.0)) * SCALER_Z;
-    ufo::math::Vector3 goal(x, y, z);
-    ufo::geometry::Sphere goal_sphere(goal, radius);
+    // ufo::math::Vector3 goal(x, y, z);
+    node goal = node(x, y, z);
+    ufo::geometry::Sphere goal_sphere(*(goal.point), RADIOUS);
     if(sqrt(pow(position_x - x, 2) + pow(position_y - y, 2) + pow(position_z - z, 2)) > MINIMUM_DISTANCE_TO_GOAL){
       if(!isInCollision(myMap, goal_sphere, true, false, true, 3) and isInCollision(myMap, goal_sphere, false, true, false, 3)){
         bool add = true;
@@ -754,7 +772,12 @@ void generateGoals(ufo::map::OccupancyMapColor const& map, bool evaluateOldGoals
           }
         }
         if(add){
-          ufo::math::Vector3 min_point(x - SENSOR_RANGE, y - SENSOR_RANGE, z - SENSOR_RANGE);
+          int foundInfo = goal.findInformationGain(SCALER_AABB, SENSOR_HORIZONTAL, SENSOR_VERTICAL, SENSOR_MIN, SENSOR_RANGE, myMap, false, true);
+          if(foundInfo == 1){
+            node* newGoal = new node(x, y, z);
+            myGoals.push_back(newGoal);
+          }
+          /*ufo::math::Vector3 min_point(x - SENSOR_RANGE, y - SENSOR_RANGE, z - SENSOR_RANGE);
           ufo::math::Vector3 max_point(x + SENSOR_RANGE, y + SENSOR_RANGE, z + SENSOR_RANGE);
           ufo::math::Vector3 position(position_x, position_y, position_z);
           ufo::geometry::AABB aabb(min_point, max_point);
@@ -769,7 +792,7 @@ void generateGoals(ufo::map::OccupancyMapColor const& map, bool evaluateOldGoals
               }
             }
           // break;
-          }
+          }*/
         }
       };
       itterations++;
@@ -795,7 +818,7 @@ void setPath(){
       allowNewPath = true;
       totalCost = std::numeric_limits<float>::max();
     }else{
-      totalCost = goalNode->sumDistance() * SCALER_DISTANCE - SCALER_INFORMATION_GAIN * (goalNode->findInformationGain(SCALER_AABB, myMap, false));
+      totalCost = goalNode->sumDistance() * SCALER_DISTANCE - SCALER_INFORMATION_GAIN * (goalNode->findInformationGain(SCALER_AABB, SENSOR_HORIZONTAL, SENSOR_VERTICAL, SENSOR_MIN, SENSOR_RANGE, myMap, false, false));
     }
   }else{
     totalCost = std::numeric_limits<float>::max();
@@ -809,9 +832,9 @@ void setPath(){
       if((*it_goal)->myParent != nullptr){
         // std::cout << "Test 1" << std::endl;
         linSpace(*it_goal, DISTANCE_BETWEEN_NODES);
-        (*it_goal)->findPathImprovement(*it_goal, myMap, DISTANCE_BETWEEN_NODES, radius);
+        (*it_goal)->findPathImprovement(*it_goal, myMap, DISTANCE_BETWEEN_NODES, RADIOUS);
         linSpace(*it_goal, DISTANCE_BETWEEN_NODES);
-        (*it_goal)->findPathImprovement(*it_goal, myMap, DISTANCE_BETWEEN_NODES, radius);
+        (*it_goal)->findPathImprovement(*it_goal, myMap, DISTANCE_BETWEEN_NODES, RADIOUS);
         // std::cout << "Test 2" << std::endl;
         //std::cout << "kommer hit? 2.2 ------------------------------------------------------------" << std::endl;
         //linSpace(*it_goal, DISTANCE_BETWEEN_NODES);
@@ -821,7 +844,7 @@ void setPath(){
         //std::cout << "Krashar efter cost calc?" << std::endl;
         double distanceCost = (*it_goal)->sumDistance() * SCALER_DISTANCE;
         // std::cout << "Test 2.1" << std::endl;
-        double informationGain = SCALER_INFORMATION_GAIN * log((*it_goal)->findInformationGain(SCALER_AABB, myMap, false));
+        double informationGain = SCALER_INFORMATION_GAIN * log((*it_goal)->findInformationGain(SCALER_AABB, SENSOR_HORIZONTAL, SENSOR_VERTICAL, SENSOR_MIN, SENSOR_RANGE, myMap, false, false));
         // std::cout << "Test 2.2" << std::endl;
         linSpace(*it_goal, DISTANCE_BETWEEN_NODES);
         // std::cout << "Test 2.3" << std::endl;
@@ -886,7 +909,7 @@ void setPath(){
 
         for (i = 0; i < 50; ++i) {
           // std::cout << i << std::endl; 
-          u[3*i] = 9.81;
+          u[3*i] = 0;
           u[3*i + 1] = 0;
           u[3*i + 2] = 0;
         }
@@ -932,7 +955,11 @@ void setPath(){
         // std::cout << "This is distance cost: " << distanceCost << std::endl;
         // std::cout << "This is informationGain: " << informationGain << std::endl; */
         // newCost = distanceCost + 0.2 * cost - informationGain;
-        newCost = distanceCost - informationGain; // + 0.05 * cost;
+        double actuationCost = SCALER_ACTUATION * cost;
+        std::cout << "This is distance: " << distanceCost << std::endl;
+        std::cout << "This is information gain: " << informationGain << std::endl;
+        std::cout << "This is actuation cost: " << actuationCost << std::endl;
+        newCost = distanceCost - informationGain + actuationCost;
         if(informationGain > initialGoalInfo){
           initialGoalInfo = informationGain;
         }
@@ -952,7 +979,7 @@ void setPath(){
         }
         bool infoRequirement = ((*it_goal)->myHits.size() > 0.2 * averageInfo or averageInfoCounter < 6);
         bool stickyFloor = ((stickyCounter < 0.8 * (*it_goal)->myHits.size()) or averageInfoCounter < 6);
-        if((newCost < totalCost) and ((*it_goal)->findInformationGain(SCALER_AABB, myMap, false) > 0) and allowNewPath and (stickyFloor and infoRequirement) and (*it_goal)->myParent != nullptr){
+        if((newCost < totalCost) and ((*it_goal)->findInformationGain(SCALER_AABB, SENSOR_HORIZONTAL, SENSOR_VERTICAL, SENSOR_MIN, SENSOR_RANGE, myMap, false, false) > 0) and allowNewPath and (stickyFloor and infoRequirement) and (*it_goal)->myParent != nullptr){
           // std::cout << newCost << " < " << totalCost << ", " << (*it_goal)->sumDistance() << " < " << 0.2 * totalDistance << std::endl;
           totalCost = newCost;
           goalNode = *it_goal;
@@ -1077,8 +1104,6 @@ void generateRRT(float given_x, float given_y, float given_z){
   }
   RRT_TREE.clear();
   std::cout << "Building RRT-tree" << std::endl;
-  float step_length = 1;
-  float sensor_range = 2;
   node* origin = new node(given_x, given_y, given_z);
   // std::cout << "My guessed point: " << given_x << ", " << given_y << ", " << given_z << std::endl;
   origin->addParent(nullptr);
@@ -1091,7 +1116,7 @@ void generateRRT(float given_x, float given_y, float given_z){
     float y = lowest_y + abs(1024 * rand () / (RAND_MAX + 1.0)) * SCALER_Y;
     float z = lowest_z + abs(1024 * rand () / (RAND_MAX + 1.0)) * SCALER_Z;
     ufo::math::Vector3 random_point(x, y, z);
-    ufo::geometry::Sphere point_sphere(random_point, radius);
+    ufo::geometry::Sphere point_sphere(random_point, RADIOUS);
     // If the point is not occupied, continue
     if(!isInCollision(myMap, point_sphere, true, false, true, 0) and isInCollision(myMap, point_sphere, false, true, false, 0)){
       // TO DO: check for unknown within sensor_range
@@ -1176,13 +1201,14 @@ std::tuple<std::list<double>, double, std::list<double>> trajectory(std::list<do
     std::list<double> v_traj{};
     double cost = 0;
     // Weight matrices
-    std::list<double> Qx = {30,30,30, 2, 2,2, 4, 4};
+    std::list<double> Qx = {5,5,5, 0, 0,0, 5, 5};
     // P = 2*Qx; #final state weight
-    std::list<double> Ru = {2, 2, 2}; // input weights
-    std::list<double> Rd = {2, 2, 2}; // input rate weights
+    std::list<double> Ru = {100, 100, 100}; // input weights
+    std::list<double> Rd = {100, 100, 100}; // input rate weights
     // print(x, u, N, dt)
-    std::list<double> u_old = {9.81,0.0,0.0};
+    std::list<double> u_old = {9.81, 0, 0};
     std::list<double> u_ref = {9.81,0.0,0.0};
+    std::list<double>::iterator x_ref_itterator = nmpc_ref.begin();
     for(int i = 0; i < N; i++){
       // State costs
       // std::list<float> x_ref = nmpc_ref[(ns*i):(ns*i+ns)];
@@ -1192,12 +1218,11 @@ std::tuple<std::list<double>, double, std::list<double>> trajectory(std::list<do
       //std::advance(Qx_itterator, i);
       std::list<double>::iterator x_itterator = x.begin();
       //std::advance(x_itterator, i);
-      std::list<double>::iterator x_ref_itterator = nmpc_ref.begin();
       // std::advance(x_ref_itterator, i*ns);
-      
+      // main2
       //std::cout << "\n" << std::endl;
       //std::cout << "this is cost: " << cost << std::endl;
-      //cost = cost + pow((*Qx_itterator) * (*x_itterator - *x_ref_itterator), 2) + Qx[1]*(x[1]-x_ref[i + 1])**2 + Qx[2]*(x[2]-x_ref[i + 2])**2 + Qx[3]*(x[3]-x_ref[i + 3])**2 + Qx[4]*(x[4]-x_ref[i + 4])**2 + Qx[5]*(x[5]-x_ref[i + 5])**2 + Qx[6]*(x[6]-x_ref[i + 6])**2 + Qx[7]*(x[7]-x_ref[i + 7])**2;  // State weights
+      // cost = cost + pow((*Qx_itterator) * (*x_itterator - *x_ref_itterator), 2) + Qx[1]*(x[1]-x_ref[i + 1])**2 + Qx[2]*(x[2]-x_ref[i + 2])**2 + Qx[3]*(x[3]-x_ref[i + 3])**2 + Qx[4]*(x[4]-x_ref[i + 4])**2 + Qx[5]*(x[5]-x_ref[i + 5])**2 + Qx[6]*(x[6]-x_ref[i + 6])**2 + Qx[7]*(x[7]-x_ref[i + 7])**2;  // State weights
       // Input Cost
       
       //Setting up itterators
@@ -1205,23 +1230,27 @@ std::tuple<std::list<double>, double, std::list<double>> trajectory(std::list<do
       std::list<double>::iterator Rd_itterator = Rd.begin();
       //std::list<float>::iterator u_n_itterator = u.begin();
       //std::advance(u_n_itterator, 3 * i);
-      std::list<double>::iterator u_ref_itterator = u_ref.begin();
+      // std::list<double>::iterator u_ref_itterator = u_ref.begin();
       std::list<double>::iterator u_old_itterator = u_old.begin();
       
       for(int j = 0; j < 3; j++){
         // std::cout << (*Rd_itterator) << ", " <<  u[3*i+j] << ", " << *u_old_itterator << std::endl;
-        cost = cost + *Ru_itterator * pow(u[3*i+j] - (*u_ref_itterator), 2);
+        cost = cost + *Ru_itterator * pow(u[3*i+j] - *u_old_itterator, 2);
+        //std::cout << *Ru_itterator << ", " << u[3*i+j] << ", " << *u_old_itterator << std::endl;
         cost = cost + *Rd_itterator * pow(u[3*i+j] - *u_old_itterator, 2);
+        // std::cout << *Rd_itterator << ", " << u[3*i+j] << ", " << *u_old_itterator << std::endl;
         Ru_itterator++;
         u_old_itterator++;
         Rd_itterator++;
-        u_ref_itterator++;
+        // u_ref_itterator++;
       }
+      std::cout << "This is cost, step by step: " << cost << std::endl;
       //std::cout << "this is cost" << cost << std::endl;
+      u_old.clear();
       u_old = {u[3*i], u[3*i+1], u[3*i+2]};
       //u_n = u[(3*i):3*i+3];
-      //cost += Ru[0]*(u_n[0] - u_ref[0])**2 + Ru[1]*(u_n[1] - u_ref[1])**2 + Ru[2]*(u_n[2] - u_ref[2])**2; // Input weights
-      //cost += Rd[0]*(u_n[0] - u_old[0])**2 + Rd[1]*(u_n[1] - u_old[1])**2 + Rd[2]*(u_n[2] - u_old[2])**2; // Input rate weights
+      // cost += Ru[0]*(u_n[0] - u_ref[0])**2 + Ru[1]*(u_n[1] - u_ref[1])**2 + Ru[2]*(u_n[2] - u_ref[2])**2; // Input weights
+      // cost += Rd[0]*(u_n[0] - u_old[0])**2 + Rd[1]*(u_n[1] - u_old[1])**2 + Rd[2]*(u_n[2] - u_old[2])**2; // Input rate weights
       //u_old = u_n;
       // x_hist = x_hist + [x];
       
@@ -1249,18 +1278,20 @@ std::tuple<std::list<double>, double, std::list<double>> trajectory(std::list<do
       x_itterator++;
       //u_n_itterator++;
       *x_itterator = *x_itterator + dt * ((1.0 / 0.5) * (u[3*i + 2] - *x_itterator));
+      std::advance(x_itterator, -7);
       /*
       p_hist = p_hist + [[x[0],x[1],x[2]]];*/
       for(int j = 0; j < 8; j++){
-        // std::cout << (*Qx_itterator) << ", " <<  (*x_itterator) << ", " << (*x_ref_itterator) << std::endl;
-        if(i < 3){
+        if(j < 3){
           cost = cost + (*Qx_itterator) * pow((*x_itterator) - (*x_ref_itterator), 2);
+          std::cout << (*Qx_itterator) << ", " <<  (*x_itterator) << ", " << (*x_ref_itterator) << std::endl;
+          x_ref_itterator++;
         }else{
           cost = cost + (*Qx_itterator) * pow((*x_itterator), 2);
+          std::cout << (*Qx_itterator) << ", " <<  (*x_itterator) << std::endl;
         }
         Qx_itterator++;
         x_itterator++;
-        x_ref_itterator++;
       }
       
       x_itterator = x.begin();
@@ -1313,6 +1344,28 @@ void mapCallback(ufomap_msgs::UFOMapStamped::ConstPtr const& msg)
   }
 }
 
+void config_callback(tutorials::ServerConfig &config, uint32_t level)
+{
+	// Read parameters
+	RUN_BY_NODES = config.Run_by_nodes;
+	NUMBER_OF_NODES = config.Number_of_nodes;
+	NUMBER_OF_GOALS = config.Number_of_goals;
+	DISTANCE_BETWEEN_NODES = config.Distance_between_nodes;
+	DISTANCE_BETWEEN_GOALS = config.Distance_between_goals;
+	MINIMUM_DISTANCE_TO_GOAL = config.Minimum_distance_to_goal;
+	RADIOUS = config.Radious;
+	SCALER_AABB = config.Bounding_box_radious;
+	SCALER_DISTANCE = config.Scaler_distance_cost;
+	SCALER_INFORMATION_GAIN = config.Scaler_information_gain;
+	SCALER_ACTUATION = config.Scaler_actuation_cost;
+	SENSOR_RANGE = config.Sensor_range;
+	SENSOR_MIN = config.Sensor_min;
+	SENSOR_HORIZONTAL = config.Sensor_angle_horizontal;
+	SENSOR_VERTICAL = config.Sensor_angle_vertical;
+	
+	
+}
+
 void odomCallback(const nav_msgs::Odometry::ConstPtr& msg){
   position_received = true;
   position_x = msg->pose.pose.position.x;
@@ -1341,18 +1394,24 @@ int main(int argc, char *argv[])
   ros::Publisher points_pub = nh.advertise<visualization_msgs::Marker>("RRT_NODES", 1);
   ros::Publisher chosen_path_visualization_pub = nh.advertise<visualization_msgs::Marker>("CHOSEN_RRT_PATH_VISUALIZATION", 1);
   // ros::Publisher chosen_path_pub = nh.advertise<nav_msgs::Path>("CHOSEN_RRT_PATH", 1);
-  ros::Publisher chosen_path_pub = nh.advertise<geometry_msgs::PoseStamped>("/shafter3d/reference", 1);
-  // ros::Publisher chosen_path_pub = nh.advertise<nav_msgs::Odometry>("/pelican/reference", 1);
+  // ros::Publisher chosen_path_pub = nh.advertise<geometry_msgs::PoseStamped>("/shafter3d/reference", 1);
+  ros::Publisher chosen_path_pub = nh.advertise<nav_msgs::Odometry>("/pelican/reference", 1);
   ros::Publisher all_path_pub = nh.advertise<visualization_msgs::Marker>("RRT_PATHS", 1);
   ros::Publisher goal_pub = nh.advertise<visualization_msgs::Marker>("RRT_GOALS", 1);
   ros::Publisher map_pub = nh.advertise<ufomap_msgs::UFOMapStamped>("goe_map", 11);
   ros::Subscriber map_sub = nh.subscribe("ufomap_mapping_server_node/map_depth_3", 1, mapCallback);
-  // ros::Subscriber sub = nh.subscribe("/pelican/ground_truth/odometry", 1, odomCallback);
-  ros::Subscriber sub = nh.subscribe("/odometry/imu", 1, odomCallback);
+  ros::Subscriber sub = nh.subscribe("/pelican/ground_truth/odometry", 1, odomCallback);
+  // ros::Subscriber sub = nh.subscribe("/odometry/imu", 1, odomCallback);
   ros::Publisher hits_pub = nh.advertise<visualization_msgs::Marker>("HITS", 1);
   ros::Publisher position_pub = nh.advertise<visualization_msgs::Marker>("POSITION", 1);
   ros::Publisher taken_path_pub = nh.advertise<visualization_msgs::Marker>("PATH_TAKEN", 1);
   ros::Rate rate(10);
+  
+  
+  dynamic_reconfigure::Server<tutorials::ServerConfig> server;
+  dynamic_reconfigure::Server<tutorials::ServerConfig>::CallbackType f;
+  f = boost::bind(&config_callback, _1, _2);
+  server.setCallback(f);
   
   // C++ bindings battlefield
   /* parameters             */
@@ -1370,7 +1429,7 @@ int main(int argc, char *argv[])
   p[7] = 0;
   
   // Trajectory
-  for (i = 1; i < 50; ++i) {
+  for (i = 0; i < 50; ++i) {
     p[8+3*i] = 0.5 * i; 
     p[8+3*i+1] = 0.5 * i;
     p[8+3*i+2] = 0;
@@ -1386,14 +1445,18 @@ int main(int argc, char *argv[])
   /* initial guess          */
   double u[150] = {0};
 
-  for (i = 0; i < 50; ++i) {
-    u[8+3*i] = 9.81;
+  for (i = 1; i < 50; ++i) {
+    u[8+3*i] = 0;
     u[8+3*i+1] = 0;
     u[8+3*i+2] = 0;
   }
+  
+  for (i = 0; i < RRT_NUM_DECISION_VARIABLES; ++i) {
+    printf("u[%d] = %g\n", i, u[i]);
+  }
 
   /* initial penalty        */
-  double init_penalty = 1.0;
+  double init_penalty = 0.0;
   void *handle = dlopen((ros::package::getPath("tutorials") + "/MAV/rrt/target/release/librrt.so").c_str(), RTLD_LAZY);
   if (!handle) {
     fprintf(stderr, "%s\n", dlerror());
@@ -1429,10 +1492,10 @@ int main(int argc, char *argv[])
     printf("u[%d] = %g\n", i, u[i]);
   }*/
 
-  printf("\n");
+  /*printf("\n");
   for (i = 0; i < RRT_N1; ++i) {
     printf("y[%d] = %g\n", i, status.lagrange[i]);
-  }
+  }*/
 
   printf("\n\n-------------------------------------------------\n");
   printf("  Solver Statistics\n");
@@ -1455,15 +1518,10 @@ int main(int argc, char *argv[])
   double N = 50;
   double dt = 0.5;
   std::list<double> x0 = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
-  std::list<double> xref_ref = {0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0};
   std::list<double> xref = {};
-  std::list<double>::iterator xref_ref_itterator_helper = xref_ref.begin();
-  for(int i = 0; i < N; i++){
-    xref.push_back(*xref_ref_itterator_helper);
-    xref_ref_itterator_helper++;
-    if(xref_ref_itterator_helper == xref_ref.end()){
-      xref_ref_itterator_helper = xref_ref.begin();
-    }
+  for(int i = 0; i < N*3; i++){
+    xref.push_back(p[8+i]);
+    // std::cout << p[8+i] << std::endl;
   }
   std::list<double> x_hist;
   std::list<double> p_hist;
@@ -1478,12 +1536,13 @@ int main(int argc, char *argv[])
   auto duration_trajectory = duration_cast<microseconds>(test_stop_trajectory - test_start_trajectory);
   std::cout << "This is the time to do trajectory: " << duration_trajectory.count() << std::endl;
   
-  for(std::list<double>::iterator path_itterator_helper = p_hist.begin(); path_itterator_helper != p_hist.end(); path_itterator_helper++){
+  /*for(std::list<double>::iterator path_itterator_helper = p_hist.begin(); path_itterator_helper != p_hist.end(); path_itterator_helper++){
     std::cout << *path_itterator_helper << std::endl;
   }
   for(std::list<double>::iterator path_itterator_helper = x_hist.begin(); path_itterator_helper != x_hist.end(); path_itterator_helper++){
     std::cout << *path_itterator_helper << std::endl;
-  }
+  }*/
+  std::cout << "\nThis is cost: " << cost << std::endl;
   
   // std::cout << "trajectory time finished" << std::endl;
   // std::cout << "p_hist " << cost << std::endl;
@@ -1513,6 +1572,7 @@ int main(int argc, char *argv[])
   
   }*/
   while(ros::ok()){
+    break;
     high_resolution_clock::time_point start_total = high_resolution_clock::now();
     //high_resolution_clock::time_point stop_total;
     // std::cout << "start 1" << std::endl;
@@ -1814,7 +1874,7 @@ int main(int argc, char *argv[])
       if(fetched_path and goalNode != nullptr){  
         itterations++;
         // std::cout << "kommer hit? 715" << std::endl;
-        if((sqrt(pow(position_x - goalNode->point->x(), 2) + pow(position_y - goalNode->point->y(), 2) + pow(position_z - goalNode->point->z(), 2)) < 0.7) or true){
+        if((sqrt(pow(position_x - goalNode->point->x(), 2) + pow(position_y - goalNode->point->y(), 2) + pow(position_z - goalNode->point->z(), 2)) < 0.7)){
           // std::cout << "kommer hit? 716" << std::endl;
           itterations = 0;
           fetched_path = false;
@@ -1993,10 +2053,10 @@ int main(int argc, char *argv[])
             // std::cout << "global planner 4" << std::endl;
             (*retrace_path_itterator)->clearInformationGain();
             // std::cout << "global planner 5" << std::endl;
-            double informationGain = (*retrace_path_itterator)->findInformationGain(SCALER_AABB, myMap, true);
+            double informationGain = (*retrace_path_itterator)->findInformationGain(SCALER_AABB, SENSOR_HORIZONTAL, SENSOR_VERTICAL, SENSOR_MIN, SENSOR_RANGE, myMap, true, false);
             // std::cout << "global planner 6" << std::endl;
             if(informationGain > 0.1 * averageInfo){
-              (*retrace_path_itterator)->findPathImprovement(*retrace_path_itterator, myMap, DISTANCE_BETWEEN_NODES, radius);
+              (*retrace_path_itterator)->findPathImprovement(*retrace_path_itterator, myMap, DISTANCE_BETWEEN_NODES, RADIOUS);
               // std::cout << "global planner 7" << std::endl;
               // linSpace(*retrace_path_itterator, DISTANCE_BETWEEN_NODES); // Core dump here?
               // std::cout << "global planner 6" << std::endl;
@@ -2169,6 +2229,7 @@ int main(int argc, char *argv[])
       }
     }
     std::cout << "This is size of reserveGoals: "  << myReserveGoals.size() << std::endl;
+    std::cout << NUMBER_OF_NODES << std::endl;
     ros::spinOnce();
     rate.sleep();
   }

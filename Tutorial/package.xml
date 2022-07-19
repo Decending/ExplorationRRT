@@ -54,6 +54,7 @@
 <build_depend>ufomap</build_depend>
 <build_depend>ufomap_msgs</build_depend>
 <build_depend>ufomap_ros</build_depend>
+<build_depend>dynamic_reconfigure</build_depend>
 <exec_depend>ufomap</exec_depend>
 <exec_depend>ufomap_msgs</exec_depend>
 <exec_depend>ufomap_ros</exec_depend>

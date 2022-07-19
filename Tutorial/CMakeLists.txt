@@ -13,6 +13,7 @@ find_package(catkin REQUIRED COMPONENTS
   ufomap_ros
   tf2_ros
   roslib
+  dynamic_reconfigure
 )
 find_package(ufomap REQUIRED)
 
@@ -93,10 +94,9 @@ include_directories(${catkin_INCLUDE_DIRS} MAV MAV/rrt/target/release)
 ##     and list every .cfg file to be processed
 
 ## Generate dynamic reconfigure parameters in the 'cfg' folder
-# generate_dynamic_reconfigure_options(
-#   cfg/DynReconf1.cfg
-#   cfg/DynReconf2.cfg
-# )
+generate_dynamic_reconfigure_options(
+  cfg/rrt.cfg
+)
 
 ###################################
 ## catkin specific configuration ##
