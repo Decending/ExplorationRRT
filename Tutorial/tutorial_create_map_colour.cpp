@@ -390,7 +390,7 @@ float lowest_z;
 float highest_x;
 float highest_y;
 float highest_z;
-float averageInfo = 100;
+float averageInfo = 50;
 float initialGoalInfo = 0.0;
 int averageInfoCounter = 0;
 double totalCost = std::numeric_limits<float>::max();
@@ -1244,7 +1244,7 @@ std::tuple<std::list<double>, double, std::list<double>> trajectory(std::list<do
         Rd_itterator++;
         // u_ref_itterator++;
       }
-      std::cout << "This is cost, step by step: " << cost << std::endl;
+      // std::cout << "This is cost, step by step: " << cost << std::endl;
       //std::cout << "this is cost" << cost << std::endl;
       u_old.clear();
       u_old = {u[3*i], u[3*i+1], u[3*i+2]};
@@ -1284,11 +1284,11 @@ std::tuple<std::list<double>, double, std::list<double>> trajectory(std::list<do
       for(int j = 0; j < 8; j++){
         if(j < 3){
           cost = cost + (*Qx_itterator) * pow((*x_itterator) - (*x_ref_itterator), 2);
-          std::cout << (*Qx_itterator) << ", " <<  (*x_itterator) << ", " << (*x_ref_itterator) << std::endl;
+          // std::cout << (*Qx_itterator) << ", " <<  (*x_itterator) << ", " << (*x_ref_itterator) << std::endl;
           x_ref_itterator++;
         }else{
           cost = cost + (*Qx_itterator) * pow((*x_itterator), 2);
-          std::cout << (*Qx_itterator) << ", " <<  (*x_itterator) << std::endl;
+          // std::cout << (*Qx_itterator) << ", " <<  (*x_itterator) << std::endl;
         }
         Qx_itterator++;
         x_itterator++;
@@ -1571,8 +1571,19 @@ int main(int argc, char *argv[])
   /*while(true){
   
   }*/
+  CHOSEN_PATH.push_back(new node(-3, 10, 2));
+  fetched_path = true;
+  RRT_created = true;
+  GOALS_generated = true;
+  position_received = true;
+  allowNewPath = false;
+  currentTarget = *CHOSEN_PATH.begin();
+  goalNode = *CHOSEN_PATH.begin();
+  CHOSEN_PATH_VREF.push_back(0);
+  CHOSEN_PATH_VREF.push_back(0);
+  CHOSEN_PATH_VREF.push_back(0);
+  vref_itterator = CHOSEN_PATH_VREF.begin();
   while(ros::ok()){
-    break;
     high_resolution_clock::time_point start_total = high_resolution_clock::now();
     //high_resolution_clock::time_point stop_total;
     // std::cout << "start 1" << std::endl;
@@ -1917,7 +1928,7 @@ int main(int argc, char *argv[])
         }
         // std::cout << "Kommer hit? slut.0.slut" << std::endl;
         // std::cout << currentTarget->point->x() << std::endl;
-        // std::cout << "passed" << std::endl;
+        std::cout << "passed" << std::endl;
         if(path_itterator != CHOSEN_PATH.end()){
           // std::cout << "kommer hit? slut.1" << std::endl;
           // geometry_msgs::PoseStamped nextPoint;
@@ -1956,7 +1967,7 @@ int main(int argc, char *argv[])
           nextPoint.header.frame_id = "world";
           chosen_path_pub.publish(nextPoint);
         }
-        // std::cout << "kommer hit? slut.1.3" << std::endl;
+        std::cout << "kommer hit? slut.1.3" << std::endl;
       }
       ufomap_msgs::UFOMapStamped::Ptr msg(new ufomap_msgs::UFOMapStamped);
       bool compress = false;
@@ -2011,7 +2022,7 @@ int main(int argc, char *argv[])
       }*/
       // std::cout << advance_index << std::endl;
       // std::cout << fetched_path << std::endl;
-      if((goalNode != nullptr or (goalNode == nullptr and GOALS_generated))){// or averageInfoCounter > 2){
+      if((goalNode != nullptr or (goalNode == nullptr and GOALS_generated))){ // or averageInfoCounter > 2){
         // std::cout << "This is my found infoGain for the chosen path: " << goalNode->myHits.size() << std::endl;
         std::cout << "This is my average infoGain: " << averageInfo << std::endl;
         std::cout << "This is my infoGain counter: " << averageInfoCounter << std::endl;
