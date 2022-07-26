@@ -227,7 +227,7 @@ struct node{
           improvementFound = myParent->findPathImprovement(targetNode, map, givenDistance, givenRadious);
         }else{
           ufo::geometry::LineSegment myLine(*(targetNode->point), *point);
-          if(!isInCollision(map, myLine, true, false, true, 3)){
+          if(!isInCollision(map, myLine, true, false, true, 0)){
             ufo::math::Vector3 newVector(targetNode->point->x() - point->x(), targetNode->point->y() - point->y(), targetNode->point->z() - point->z());
             float distance = newVector.norm();
             float itterations = (distance / givenDistance);
@@ -238,7 +238,7 @@ struct node{
             for(int i = 1; i < itterations; i++){
               ufo::math::Vector3 newVector = ufo::math::Vector3(point->x() + i * xStep, point->y() + i * yStep, point->z() + i * zStep);
               ufo::geometry::Sphere new_sphere(newVector, givenRadious);
-              if(isInCollision(map, new_sphere, true, false, true, 3)){
+              if(isInCollision(map, new_sphere, true, false, true, 0)){
                 return false;
               }
             }
@@ -250,7 +250,7 @@ struct node{
         }
         if(!improvementFound){
           ufo::geometry::LineSegment myLine(*(targetNode->point), *point);
-          if(!isInCollision(map, myLine, true, false, true, 3)){
+          if(!isInCollision(map, myLine, true, false, true, 0)){
             ufo::math::Vector3 newVector(targetNode->point->x() - point->x(), targetNode->point->y() - point->y(), targetNode->point->z() - point->z());
             float distance = newVector.norm();
             float itterations = (distance / givenDistance);
@@ -598,6 +598,16 @@ void visualize(ros::Publisher* points_pub, ros::Publisher* chosen_path_visualiza
     hits_pub->publish(HITS_points);
   }
   if(goalNode != nullptr){
+    TAKEN_PATH_points.header.frame_id = "world";
+    TAKEN_PATH_points.ns = "points";
+    TAKEN_PATH_points.action = visualization_msgs::Marker::ADD;
+    TAKEN_PATH_points.pose.orientation.w = 1.0;
+    TAKEN_PATH_points.id = 0;
+    TAKEN_PATH_points.type = visualization_msgs::Marker::POINTS;
+    TAKEN_PATH_points.scale.x = 0.2;
+    TAKEN_PATH_points.scale.y = 0.2;
+    TAKEN_PATH_points.color.r = 1.0f;
+    TAKEN_PATH_points.color.a = 1.0;
     std::list<node*>::iterator taken_path_visualizer;
     for(taken_path_visualizer = VISITED_POINTS.begin(); taken_path_visualizer != VISITED_POINTS.end(); taken_path_visualizer++){
       geometry_msgs::Point p;
