@@ -1,0 +1,5 @@
+<?xml version="1.0" ?>
+<launch>
+  <node pkg="errt" type="errt_node" name="errt_node" output="screen" required="true">
+  </node>
+</launch>
