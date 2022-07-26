@@ -140,6 +140,7 @@ class Server
 
 	// Integration
 	double max_range_;
+	double min_range_;
 	ufo::map::DepthType insert_depth_;
 	bool simple_ray_casting_;
 	unsigned int early_stopping_;
