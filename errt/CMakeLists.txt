@@ -94,9 +94,9 @@ include_directories(${catkin_INCLUDE_DIRS} MAV MAV/rrt/target/release)
 ##     and list every .cfg file to be processed
 
 ## Generate dynamic reconfigure parameters in the 'cfg' folder
-generate_dynamic_reconfigure_options(
-  cfg/errt.cfg
-)
+##generate_dynamic_reconfigure_options(
+##  cfg/errt.cfg
+##)
 
 ###################################
 ## catkin specific configuration ##
