@@ -98,7 +98,7 @@ void Server::cloudCallback(sensor_msgs::PointCloud2::ConstPtr const &msg)
 		transform =
 		    ufomap_ros::rosToUfo(tf_buffer_
 		                             // .lookupTransform("odom_ouster", "os_sensor",
-		                             .lookupTransform("world", "pelican/imu_link",
+		                             .lookupTransform(frame_id_, robot_frame_id_,
 		                                              msg->header.stamp, transform_timeout_)
 		                             .transform);
 	} catch (tf2::TransformException &ex) {
@@ -116,7 +116,7 @@ void Server::cloudCallback(sensor_msgs::PointCloud2::ConstPtr const &msg)
 			    ufomap_ros::rosToUfo(*msg, cloud);
 			    cloud.transform(transform, true);
 
-			    map.insertPointCloudDiscrete(transform.translation(), cloud, max_range_,
+			    map.insertPointCloudDiscrete(transform.translation(), cloud, max_range_, min_range_,
 			                                 insert_depth_, simple_ray_casting_,
 			                                 early_stopping_, async_);
 
@@ -141,7 +141,7 @@ void Server::cloudCallback(sensor_msgs::PointCloud2::ConstPtr const &msg)
 				    try {
 					    transform = ufomap_ros::rosToUfo(
 					        tf_buffer_
-					            .lookupTransform("world", robot_frame_id_, msg->header.stamp,
+					            .lookupTransform(frame_id_, robot_frame_id_, msg->header.stamp,
 					                             transform_timeout_)
 					            .transform);
 				    } catch (tf2::TransformException &ex) {
@@ -495,7 +495,7 @@ void Server::configCallback(ufomap_mapping::ServerConfig &config, uint32_t level
 	if (!cloud_sub_ || cloud_in_queue_size_ != config.cloud_in_queue_size) {
 		cloud_in_queue_size_ = config.cloud_in_queue_size;
 		cloud_sub_ =
-		    nh_.subscribe("/pelican/velodyne_points", cloud_in_queue_size_, &Server::cloudCallback, this);
+		    nh_.subscribe("cloud_in", cloud_in_queue_size_, &Server::cloudCallback, this);
 		    // nh_.subscribe("/os_cloud_node/points", cloud_in_queue_size_, &Server::cloudCallback, this);
 	}
 

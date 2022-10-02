@@ -6,7 +6,7 @@
 	<arg name="color" default="true" />
 
   <node pkg="ufomap_mapping" type="ufomap_mapping_server_node" name="ufomap_mapping_server_node" output="log" required="true">
-		<remap from="cloud_in" to="/camera/depth/points" />
+		<remap from="cloud_in" to="/pelican/velodyne_points" />
 
 		<param name="num_workers" value="$(arg num_workers)" />
 		
