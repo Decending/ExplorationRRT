@@ -8,8 +8,8 @@ The ufomap_mapping folder contains a customized ufomap mapper module, which buil
 
 The errt requires the ufomap from the mapper to function properly, so to run the framework one has to launch the mapper with:
 
-roslaunch ufomap_mapper server.launch
+{roslaunch ufomap_mapper server.launch}
 
 followed by the errt module by running:
 
-roslaunch errt errt.launch
+{roslaunch errt errt.launch}
