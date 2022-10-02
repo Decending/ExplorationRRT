@@ -1,1 +1,2 @@
-# Examinations-Project
+# Exploratory rapidly-exploring random tree (ERRT)
+
