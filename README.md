@@ -11,6 +11,6 @@ The errt requires the ufomap from the mapper to function properly, so to run the
 roslaunch ufomap_mapper server.launch
 ```
 followed by the errt module by running:
-'''
-{roslaunch errt errt.launch}
-'''
+```
+roslaunch errt errt.launch
+```
