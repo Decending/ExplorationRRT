@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.0.2)
-project(tutorials)
+project(errt)
 
 ## Compile as C++11, supported in ROS Kinetic and newer
 # add_compile_options(-std=c++11)
@@ -12,10 +12,12 @@ find_package(catkin REQUIRED COMPONENTS
   ufomap_msgs
   ufomap_ros
   tf2_ros
+  roslib
+  dynamic_reconfigure
 )
 find_package(ufomap REQUIRED)
 
-include_directories(${catkin_INCLUDE_DIRS})
+include_directories(${catkin_INCLUDE_DIRS} MAV MAV/rrt/target/release) 
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
@@ -92,10 +94,9 @@ include_directories(${catkin_INCLUDE_DIRS})
 ##     and list every .cfg file to be processed
 
 ## Generate dynamic reconfigure parameters in the 'cfg' folder
-# generate_dynamic_reconfigure_options(
-#   cfg/DynReconf1.cfg
-#   cfg/DynReconf2.cfg
-# )
+##generate_dynamic_reconfigure_options(
+##  cfg/errt.cfg
+##)
 
 ###################################
 ## catkin specific configuration ##
@@ -138,7 +139,7 @@ include_directories(
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 # add_executable(${PROJECT_NAME}_node src/tutorials_node.cpp)
-add_executable(Tutorial_create_map_colour_node tutorial_create_map_colour.cpp)
+add_executable(${PROJECT_NAME}_node errt.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -154,10 +155,11 @@ add_executable(Tutorial_create_map_colour_node tutorial_create_map_colour.cpp)
 # target_link_libraries(${PROJECT_NAME}_node
 #   ${catkin_LIBRARIES}
 # )
-target_link_libraries(Tutorial_create_map_colour_node
+target_link_libraries(${PROJECT_NAME}_node
   ${catkin_LIBRARIES}
+  ${CMAKE_DL_LIBS}
 )
-target_link_libraries(Tutorial_create_map_colour_node UFO::Map)
+target_link_libraries(${PROJECT_NAME}_node UFO::Map)
 
 #############
 ## Install ##
@@ -213,3 +215,17 @@ target_link_libraries(Tutorial_create_map_colour_node UFO::Map)
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
+
+add_executable(rrt ${CMAKE_SOURCE_DIR}/MAV/rrt/example_optimizer.c)
+
+# Add libraries to the executable
+target_link_libraries(rrt ${CMAKE_SOURCE_DIR}/MAV/rrt/target/release/librrt.a)
+target_link_libraries(rrt m)
+target_link_libraries(rrt dl)
+target_link_libraries(rrt pthread)
+
+add_custom_target(run
+    COMMAND rrt
+    DEPENDS rrt
+    WORKING_DIRECTORY ${CMAKE_PROJECT_DIR}
+)
