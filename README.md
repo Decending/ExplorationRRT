@@ -1,8 +1,56 @@
 # Exploratory rapidly-exploring random tree (ERRT)
 
-The errt folder contains the implemented ERRT framework; This includes the launch file to facilitate easier modification of the variables. The launch file contains all the internal variables and a description for the them.
+The ERRT framework consists of ERRT module and the ufomap mapper, both of which depend on the ufomap software. The errt folder contains the implemented ERRT module, the ufomap_mapping folder contains the modified ufomap mapper and the Ufomap folder contains the ufomap as it existed as this project came to a close.
 
-The ufomap_mapping folder contains a customized ufomap mapper module, which builds an ufomap on depth one through four, given the necessary point cloud data.
+# Installation 
+
+It is assumed that the Noetic version of robot operating system (ROS) has been installed; if not follow the guide at the following link:
+
+http://wiki.ros.org/noetic/Installation/Ubuntu
+
+After ROS Noetic has been sucessfully installed, follow the steps below:
+Install the Intel(R) Threading Building Blocks 2018:
+```
+sudo apt install libtbb-dev
+```
+
+Prerequisites:
+```
+sudo apt install python3-catkin-tools python3-osrf-pycommon
+mkdir -p ~/catkin_ws/src
+cd ~/catkin_ws
+catkin init # Init Catkin workspace
+catkin config --extend /opt/ros/noetic  # exchange noetic for your ros distro if necessary
+catkin config --cmake-args -DCMAKE_BUILD_TYPE=Release # To enable release mode compiler optimzations
+```
+It will be assumed that your Catkin workspace is in ~/catkin_ws.
+
+1. Install system dependencies
+```
+sudo apt install libtbb-dev
+```
+
+2. Move into your Catkin workspace
+```
+cd ~/catkin_ws/src
+```
+
+3. Clone the framework using either SSH or HTTPS
+```
+git clone https://github.com/Decending/ExplorationRRT.git
+```
+or
+```
+git clone git@github.com:Decending/ExplorationRRT.git
+```
+
+4.
+```
+# Build your workspace
+catkin build
+# Source your workspace
+source ../devel/setup.bash
+```
 
 # Fundamentals
 
