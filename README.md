@@ -60,7 +60,7 @@ python3 rrt_costgen.py
 # Build your workspace
 catkin build
 # Source your workspace
-source ../devel/setup.bash
+source ../../devel/setup.bash
 ```
 
 # Fundamentals
