@@ -59,8 +59,10 @@ python3 rrt_costgen.py
 ```
 # Build your workspace
 catkin build
+# Move out of errt folder
+cd ~/catkin_ws
 # Source your workspace
-source ../../devel/setup.bash
+source devel/setup.bash
 ```
 
 # Fundamentals
