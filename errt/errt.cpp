@@ -389,6 +389,7 @@ double pitch = 0;
 double yaw = 0;
 double totalCost = std::numeric_limits<float>::max();
 double totalDistance = -1;
+string MAP_FRAME_ID;
 node* goalNode = nullptr;
 node* reserveGoalNode = nullptr;
 node* currentTarget;
@@ -480,7 +481,7 @@ void evaluateCurrentPoint(ros::Publisher* chosen_path_pub){
     nextPoint.pose.pose.orientation.z = 0;
     nextPoint.pose.pose.orientation.w = 0;
     nextPoint.header.stamp = ros::Time::now();
-    nextPoint.header.frame_id = "world";
+    nextPoint.header.frame_id = MAP_FRAME_ID;
     chosen_path_pub->publish(nextPoint);
   }
 }
@@ -490,7 +491,7 @@ void visualize(ros::Publisher* points_pub, ros::Publisher* chosen_path_visualiza
   visualization_msgs::Marker RRT_points, RRT_line_list, CHOSEN_PATH_points, CHOSEN_PATH_line_list, PATH_points, PATH_line_list, GOAL_points, HITS_points, TAKEN_PATH_points, TAKEN_PATH_line_list, POSITION_point;
   // Visualize each itteration
   if(position_received){
-    POSITION_point.header.frame_id = "world";
+    POSITION_point.header.frame_id = MAP_FRAME_ID;
     POSITION_point.ns = "points";
     POSITION_point.action = visualization_msgs::Marker::ADD;
     POSITION_point.pose.orientation.w = 1.0;
@@ -510,7 +511,7 @@ void visualize(ros::Publisher* points_pub, ros::Publisher* chosen_path_visualiza
   // Visualize only once
   if(visualizeNewData){
     if(RRT_created){
-      RRT_points.header.frame_id = RRT_line_list.header.frame_id = "world";
+      RRT_points.header.frame_id = RRT_line_list.header.frame_id = MAP_FRAME_ID;
       RRT_points.ns = "points";
       RRT_points.action = visualization_msgs::Marker::ADD;
       RRT_points.pose.orientation.w = 1.0;
@@ -544,7 +545,7 @@ void visualize(ros::Publisher* points_pub, ros::Publisher* chosen_path_visualiza
       points_pub->publish(RRT_line_list);
     }
     if(!CHOSEN_PATH.empty()){
-      CHOSEN_PATH_points.header.frame_id = CHOSEN_PATH_line_list.header.frame_id = "world";
+      CHOSEN_PATH_points.header.frame_id = CHOSEN_PATH_line_list.header.frame_id = MAP_FRAME_ID;
       CHOSEN_PATH_points.ns = "points";
       CHOSEN_PATH_points.action = visualization_msgs::Marker::ADD;
       CHOSEN_PATH_points.pose.orientation.w = 1.0;
@@ -579,7 +580,7 @@ void visualize(ros::Publisher* points_pub, ros::Publisher* chosen_path_visualiza
       chosen_path_visualization_pub->publish(CHOSEN_PATH_points);
     }
     if(RRT_created){
-      PATH_points.header.frame_id = PATH_line_list.header.frame_id = "world";
+      PATH_points.header.frame_id = PATH_line_list.header.frame_id = MAP_FRAME_ID;
       PATH_points.ns = "points";
       PATH_points.action = visualization_msgs::Marker::ADD;
       PATH_points.pose.orientation.w = 1.0;
@@ -612,7 +613,7 @@ void visualize(ros::Publisher* points_pub, ros::Publisher* chosen_path_visualiza
       all_path_pub->publish(PATH_line_list);
     }
     if(GOALS_generated){
-      GOAL_points.header.frame_id = "world";
+      GOAL_points.header.frame_id = MAP_FRAME_ID;
       GOAL_points.ns = "points";
       GOAL_points.action = visualization_msgs::Marker::ADD;
       GOAL_points.pose.orientation.w = 1.0;
@@ -635,7 +636,7 @@ void visualize(ros::Publisher* points_pub, ros::Publisher* chosen_path_visualiza
     if(goalNode != nullptr){
       hits.clear();
       goalNode->addHits(&hits);
-      HITS_points.header.frame_id = "world";
+      HITS_points.header.frame_id = MAP_FRAME_ID;
       HITS_points.ns = "points";
       HITS_points.action = visualization_msgs::Marker::ADD;
       HITS_points.pose.orientation.w = 1.0;
@@ -656,7 +657,7 @@ void visualize(ros::Publisher* points_pub, ros::Publisher* chosen_path_visualiza
       hits_pub->publish(HITS_points);
     }
     if(goalNode != nullptr){
-      TAKEN_PATH_points.header.frame_id = "world";
+      TAKEN_PATH_points.header.frame_id = MAP_FRAME_ID;
       TAKEN_PATH_points.ns = "points";
       TAKEN_PATH_points.action = visualization_msgs::Marker::ADD;
       TAKEN_PATH_points.pose.orientation.w = 1.0;
@@ -681,7 +682,7 @@ void visualize(ros::Publisher* points_pub, ros::Publisher* chosen_path_visualiza
     ufo::map::DepthType pub_depth = 0;
     if(ufomap_msgs::ufoToMsg(myMap, msg->map, compress, pub_depth)) {
       msg->header.stamp = ros::Time::now();
-      msg->header.frame_id = "world";
+      msg->header.frame_id = MAP_FRAME_ID;
       map_pub->publish(msg);					        
     }else{
       std::cout << "Map conversion failed!" << std::endl;
@@ -1401,6 +1402,8 @@ int main(int argc, char *argv[])
     CHOSEN_PATH_VREF.push_back(0);
     vref_itterator = CHOSEN_PATH_VREF.begin();
   }
+  
+  ros::param::get("/MAP_FRAME_ID_", MAP_FRAME_ID);
   
   ros::param::get("/RUN_BY_NODES_", RUN_BY_NODES);
   ros::param::get("/NUMBER_OF_NODES_", NUMBER_OF_NODES);
