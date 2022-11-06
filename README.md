@@ -44,7 +44,18 @@ or
 git clone git@github.com:Decending/ExplorationRRT.git
 ```
 
-4.
+
+4. Move into your the errt folder
+```
+cd errt
+```
+
+5. Build the optimizer
+```
+python3 rrt_costgen.py
+```
+
+6.
 ```
 # Build your workspace
 catkin build
