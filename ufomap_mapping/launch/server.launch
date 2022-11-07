@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
 <launch>
-	<arg name="resolution" default="0.05" />
+	<arg name="resolution" default="0.4" />
 	<arg name="depth_levels" default="16" />
 	<arg name="num_workers" default="1" />
 	<arg name="color" default="true" />
