@@ -1,6 +1,6 @@
 <?xml version="1.0" ?>
 <launch>									<!-- Parameter descriptions -->
-  <param name="MAP_FRAME_ID_" type="str" value="world"/>			<!-- The ufomaps frame id -->
+  <param name="MAP_FRAME_ID_" type="str" value="robot/base_link"/>			<!-- The ufomaps frame id -->
 
   <!-- RRT general parameters -->
   <param name="RUN_BY_NODES_" type="bool" value="true" />			<!-- Run by number_of_nodes if true and by Number_of_itterations if false -->
